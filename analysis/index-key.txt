@@ -1,0 +1,11 @@
+Condition Repeat Index
+100uM_DecanoicAcid 1 TCGCCTTA
+100uM_DecanoicAcid 2 CTAGTACG
+1mM_DecanoicAcid 1 TTCTGCCT
+1mM_DecanoicAcid 2 GCTCAGGA
+100uM_Acetophenone 1 AGGAGTCC
+100uM_Acetophenone 2 CATGCCTA
+1mM_Acetophenone 1 GTAGAGAG
+1mM_Acetophenone 2 CCTCTCTG
+Negative 1 AGCGTAGC
+Negative 2 CAGCCTCG

@@ -1,0 +1,141 @@
+---
+title: "Olfaction First Pass"
+output: html_notebook
+---
+# Initializations
+```{r, deps}
+library(viridis) # pretty scales!
+library(magrittr)
+library(tidyverse)
+
+
+theme_pub <- function(base_size = 13, base_family = "") {
+  require(grid)
+  # based on https://github.com/noamross/noamtools/blob/master/R/theme_nr.R
+  # start with theme_bw and modify from there!
+  theme_bw(base_size = base_size, base_family = base_family) +# %+replace%
+    theme(
+      # grid lines
+      panel.grid.major.x = element_line(colour="#ECECEC", size=0.5, linetype=1),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.minor.y = element_blank(),
+      panel.grid.major.y = element_line(colour="#ECECEC", size=0.5, linetype=1),
+      panel.background   = element_blank(),
+
+      # axis options
+      axis.ticks.y   = element_blank(),
+      axis.title.x   = element_text(size=rel(2.25), vjust=0.25),
+      axis.title.y   = element_text(size=rel(2.25), vjust=0.35),
+      axis.text      = element_text(color="black", size=rel(1.5)),
+
+      # legend options
+      legend.title    = element_blank(),
+      legend.key      = element_rect(fill="white"),
+      legend.key.size = unit(1, "cm"),
+      legend.text     = element_text(size=rel(2)),
+
+      # facet options
+      strip.text = element_text(size=rel(2)),
+
+      # title options
+      plot.title = element_text(size=rel(3), vjust=0.25, hjust=0.5)
+      )
+  }
+
+# set the theme and brewer color
+theme_set(theme_pub())
+```
+
+## Load Everything
+```{r, loading}
+# only for local development
+setwd('~/Dropbox/UCLA/Kosuri/ADRB2/analysis/')
+counts.per.idx <- read_delim('output/idx-bcs-counts.txt', delim = ' ',
+                             col_names = c('Index', 'Barcode', 'Count'))
+
+idx.key <- inner_join(
+  read_delim('idx-key.txt', delim = ' '),
+  read_delim('output/idx-counts.txt', delim = ' ', col_names = c('Index', 'Reads')),
+  by = 'Index'
+)
+
+single.mutants <- read_delim('output/Eric_S5.known-vars.txt', delim = ' ',
+                             col_names = c('Barcode', 'Variant'))
+```
+
+# Basic Info
+## Reads / Barcode across Conditions
+```{r, reads-per-bc}
+counts.per.idx %>%
+  inner_join(idx.key, by = 'Index') %>%
+  mutate(Name = paste(Condition, Repeat, sep="_")) %>%
+  ggplot(aes(x=Count, color=Name)) +
+  geom_density() +
+  scale_x_log10() +
+  annotation_logticks(sides='b')
+```
+
+## BC Coverage
+```{r, bc-coverage}
+single.mutants %>%
+  count(Variant) %>%
+  ggplot(aes(x=n)) +
+  geom_density() +
+  scale_x_log10() +
+  annotation_logticks(sides = 'b')
+```
+
+## Average the known WT barcodes for each condition
+```{r, wt-control}
+wt.norm <- counts.per.idx %>%
+  inner_join(idx.key, by = 'Index') %>%
+  inner_join(bc.key, by = 'Barcode') %>%
+  group_by(Condition) %>%
+  summarise(WT_Norm = mean(Count / Reads))
+```
+
+## Number of distinct variants per condition
+```{r}
+counts.per.idx %>%
+  inner_join(single.mutants, by = 'Barcode') %>%
+  inner_join(idx.key, by = 'Index') %>%
+  group_by(Condition) %>%
+  summarise(N = n_distinct(Variant))
+```
+
+## Rough HeatMap
+```{r, heatmap}
+# take median expression level for each variant across conditions
+per.variant <- counts.per.idx %>%
+  inner_join(single.mutants, by = 'Barcode') %>%
+  inner_join(idx.key, by = 'Index') %>%
+  group_by(Condition, Variant, Barcode) %>%
+  summarise(Norm = mean(Count / Reads)) %>%
+  summarise(Variant_Norm = median(Norm)) %>%
+  ungroup() %>%
+  # normalize to WT levels
+  inner_join(wt.norm, by = 'Condition') %>%
+  mutate(RelWT = Variant_Norm / WT_Norm)
+
+tmp <- per.variant %>%
+  filter(Condition == 0) %>%
+  select(Variant, Init = RelWT) %>%
+  mutate(
+    Pos = as.integer(str_extract(Variant, '\\d+')),
+    AA = str_extract(Variant, '\\D$')
+  ) %>%
+  inner_join(per.variant, by = 'Variant') %>%
+  mutate(fold = log(RelWT / Init)) #%>%
+
+tmp %>%
+  filter(Condition > 0) %>%
+  ggplot(aes(x=Pos, y=AA, fill=fold)) +
+  geom_raster() +
+  facet_wrap(~ Condition) +
+  scale_fill_viridis() +
+  scale_x_continuous(breaks = seq(0,450, 50)) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+```
