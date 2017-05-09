@@ -6,8 +6,10 @@ output: html_notebook
 ```{r, deps}
 library(scales) # for oob=squish trick (see: https://github.com/tidyverse/ggplot2/issues/866)
 library(viridis) # pretty scales!
+library(MASS)
 library(stringr)
 library(magrittr)
+library(modelr)
 library(tidyverse)
 
 
@@ -60,16 +62,13 @@ idx.key <- inner_join(
   read_delim('output/idx-counts.txt', delim = ' ', col_names = c('Index', 'Reads')),
   by = 'Index'
 )
-```
 
-# Basic Info
-## Link OR to Barcodes and Conditions
-```{r, link-ors}
 or.counts <- counts.per.idx %>%
     inner_join(or.key, by = 'Barcode') %>%
     inner_join(idx.key, by = 'Index')
 ```
 
+# Basic Info
 ## Correlations
 ```{r, corrs}
 or.counts %>% 
@@ -78,7 +77,8 @@ or.counts %>%
     Repeat = if_else(Repeat == 1, 'One', 'Two')
   ) %>% 
   select(OR, Drug, Conc, Repeat, Norm) %>% 
-  spread(Repeat, Norm) %T>% 
+  spread(Repeat, Norm) %>%
+  filter(!is.na(Two)) %T>% 
   {
     group_by(., Drug, Conc) %>%
       summarise(Cor = cor(One, Two, use = 'complete')) %>%
@@ -90,7 +90,7 @@ or.counts %>%
   geom_abline(color='red')
 ```
 ## Rough HeatMap
-```{r, heatmap}
+```{r, per-or}
 # take median expression level for each variant across conditions
 per.or <- counts.per.idx %>%
   inner_join(or.key, by = 'Barcode') %>%
@@ -98,7 +98,45 @@ per.or <- counts.per.idx %>%
   group_by(OR, Drug, Conc) %>%
   summarise(Norm = mean(Count / Reads)) %>%
   ungroup()
+```
 
+Here we will plot the normallized read counts of the negative data vs the drug condition. We expect that highly activated ORs will spike relative to the negative.
+
+```{r, drug-lm}
+per.or %>%
+  filter(Drug == 'Negative') %>%
+  select(OR, Zero = Norm) %>%
+  inner_join(per.or, by = 'OR') %>%
+  ggplot(aes(x=Zero, y=Norm, color=Conc)) +
+  geom_point() +
+  geom_abline(color = 'red') + 
+  geom_smooth(se=F, method = 'lm', linetype = 'dashed') +
+  geom_smooth(se=F, method = 'rlm') +
+  facet_wrap(~ Drug)
+```
+
+We see that the robust regression (solid line) provides a more accurate fit than the standard LM.
+
+```{r, lm_heatmap}
+per.or %>%
+  filter(Drug == 'Negative') %>%
+  select(OR, Zero = Norm) %>%
+  inner_join(per.or, by = 'OR') %>%
+  group_by(Drug, Conc) %>%
+  nest() %>%
+  filter(Drug != 'Negative') %>%
+  mutate(LM = map(data, ~ rlm(Norm ~ Zero, data = .x, maxit = 40)),
+         Preds = map2(data, LM, add_predictions)) %>%
+  unnest(Preds) %>%
+  mutate(LM_Norm = (Norm - pred) / pred) %>%
+  ggplot(aes(x = OR, y = interaction(Conc, Drug), fill = LM_Norm)) +
+  geom_raster() +
+  scale_fill_distiller(direction = 1) +
+  theme(axis.text.x = element_text(angle = 315, hjust = 0.1, vjust = 0.9))
+```
+
+
+```{r, heatmap}
 per.or %>% 
   filter(Drug == 'Negative') %>% 
   select(OR, Zero = Norm) %>% 
@@ -107,8 +145,9 @@ per.or %>%
   filter(Drug != 'Negative', OR != '181_1') %>% # dead OR
   ggplot(aes(x = OR, y = interaction(Conc, Drug), fill=Fold)) + 
   geom_raster() + 
-  #scale_fill_viridis(limits = c(-2,2), na.value = 'transparent', oob=squish) +
-  scale_fill_distiller(palette = "RdBu", limits = c(-2,2), direction = 1, oob=squish) + 
+  #scale_fill_viridis() +
+  scale_fill_distiller(palette = "RdBu", limits = c(0,2), direction = 1, oob=squish) + 
+  #scale_fill_distiller(palette = "RdBu", direction = 1) +
   theme(axis.text.x = element_text(angle = 315, hjust = 0.1, vjust = 0.9)) +
   labs(y = 'Treatment')
 ```
