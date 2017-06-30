@@ -54,8 +54,8 @@ theme_set(theme_pub())
 ```{r, loading}
 # only for local development
 setwd('~/Dropbox/UCLA/Kosuri/olfaction/analysis/')
-counts.per.idx <- read_delim('output/idx-bcs-counts.txt', delim = ' ',
-                             col_names = c('Index', 'Barcode', 'Count'))
+
+counts.per.idx <- read_delim('output/idx-bcs-counts.txt', delim = ' ', col_names = c('Index', 'Barcode', 'Count'))
 or.key <- read_delim('barcode-or.txt', delim = ' ')
 idx.key <- inner_join(
   read_delim('index-key.txt', delim = ' '),
@@ -90,11 +90,9 @@ or.counts %>%
   geom_abline(color='red')
 ```
 ## Rough HeatMap
+Average the repeats together
 ```{r, per-or}
-# take median expression level for each variant across conditions
-per.or <- counts.per.idx %>%
-  inner_join(or.key, by = 'Barcode') %>%
-  inner_join(idx.key, by = 'Index') %>%
+per.or <- or.counts %>%
   group_by(OR, Drug, Conc) %>%
   summarise(Norm = mean(Count / Reads)) %>%
   ungroup()
@@ -128,11 +126,34 @@ per.or %>%
   mutate(LM = map(data, ~ rlm(Norm ~ Zero, data = .x, maxit = 40)),
          Preds = map2(data, LM, add_predictions)) %>%
   unnest(Preds) %>%
-  mutate(LM_Norm = (Norm - pred) / pred) %>%
-  ggplot(aes(x = OR, y = interaction(Conc, Drug), fill = LM_Norm)) +
+  mutate(
+    LM_Norm = (Norm - pred) / pred,
+    Label = str_replace_all(interaction(Conc, Drug), "_|\\.", " ") %>%
+      factor(levels = c("1mM Vanillic Acid", "100uM Vanillic Acid",
+                        "1mM Prenyl Acetate", "100uM Prenyl Acetate",
+                        "1mM Fenchone", "100uM Fenchone",
+                        "1mM Carvone", "100uM Carvone",
+                        "1mM Heptanoic Acid", "100uM Heptanoic Acid",
+                        "1mM Octanoic Acid", "100uM Octanoic Acid",
+                        "1mM Decanoic Acid", "100uM Decanoic Acid",
+                        "1mM Acetophenone", "100uM Acetophenone",
+                        "1mM 2-coumeronone", "100uM 2-coumeronone",
+                        "100uM 2-coumeronone+Decanoic Acid", "100uM 2-coumeronone+Decanoic Acid+Acetophenone"))
+  ) %>%
+  ggplot(aes(x = OR, y = Label, fill = LM_Norm)) +
   geom_raster() +
   scale_fill_distiller(direction = 1) +
-  theme(axis.text.x = element_text(angle = 315, hjust = 0.1, vjust = 0.9))
+  # labs(
+  #   x = 'Receptor',
+  #   y = 'Odorant',
+  #   fill = 'Relative\nActivation'
+  # ) +
+  theme(
+    axis.text.x = element_text(angle = 315, hjust = 0.1, vjust = 0.9),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+    # legend.title = element_text(size = rel(2.25))
+    )
 ```
 
 
@@ -151,3 +172,41 @@ per.or %>%
   theme(axis.text.x = element_text(angle = 315, hjust = 0.1, vjust = 0.9)) +
   labs(y = 'Treatment')
 ```
+
+# 96-well data
+```{r, 96-well-loading}
+# only for local development
+setwd('~/Dropbox/UCLA/Kosuri/olfaction/analysis/')
+
+counts.per.idx.96well <- read_delim('output/96-well_idx-bcs-counts.txt', delim = ' ', col_names = c('Index', 'Barcode', 'Count'))
+idx.key.96well <- inner_join(
+  read_delim('96-well_index-key.txt', delim = ' '),
+  read_delim('output/96-well_idx-counts.txt', delim = ' ', col_names = c('Index', 'Reads')),
+  by = 'Index'
+)
+
+# no need to average repeats here
+or.counts.96well <- counts.per.idx.96well %>%
+  inner_join(or.key, by = 'Barcode') %>%
+  inner_join(idx.key.96well, by = 'Index') %>%
+  mutate(Norm = Count / Reads)
+```
+
+## 96-well heatmap
+First we will normalize relative to forskolin
+
+```{r, forsk-norm}
+or.counts.96well %>%
+  filter(Drug == 'Forskolin') %>%
+  select(OR, Zero = Norm) %>%
+  inner_join(or.counts.96well, by = 'OR') %>%
+  mutate(Fold = log2(Norm / Zero)) %>% 
+  filter(!Drug %in% c('Forskolin', 'Ethanol_1PCRStep', 'Forskolin_1PCRStep')) %>%
+  ggplot(aes(x = OR, y = Drug, fill=Fold)) + 
+  geom_raster() + 
+  #scale_fill_viridis() +
+  scale_fill_distiller(palette = "RdBu", direction = 1, oob=squish) + 
+  theme(axis.text.x = element_text(angle = 315, hjust = 0.1, vjust = 0.9)) +
+  labs(y = 'Treatment')
+```
+

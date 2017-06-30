@@ -57,6 +57,6 @@ output/96-well_idx-counts.txt: pipeline/pilot-2_96-well_idx-bcs.txt.gz
 
 # filter reads to only be in the correct index
 # then count all barcodes associated with it
-output/96-well_idx-bcs-counts.txt: 96-well-indexes.txt pipeline/pilot-2_96-well_idx-bcs.txt.gz
+output/96-well_idx-bcs-counts.txt: 96-well_raw-indexes.txt pipeline/pilot-2_96-well_idx-bcs.txt.gz
 	parallel zcat $(filter-out $<, $^) \| awk -v idx=\"{}\" \''$$1 == idx {a[$$2]++} END {for(bc in a) print idx, bc, a[bc]}'\' :::: $< > $@
 

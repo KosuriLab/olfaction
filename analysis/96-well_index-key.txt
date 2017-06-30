@@ -1,0 +1,13 @@
+Drug Index Conc
+Ethanol TCGCCTTA 25
+Forskolin CTAGTACG 25
+2_coumaranone TTCTGCCT 25
+Eugenol GCTCAGGA 25
+Heptanoic_Acid AGGAGTCC 25
+Vanillic_Acid CATGCCTA 25
+Acetophenone GTAGAGAG 25
+Octanoic_Acid CCTCTCTG 25
+Decanoic_Acid AGCGTAGC 25
+Prenyl_Acetate CAGCCTCG 25
+Ethanol_1PCRStep TGCCTCTT 25
+Forskolin_1PCRStep TCCTCTAC 25
