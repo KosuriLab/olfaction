@@ -34,14 +34,39 @@ CTS <-  or.chems %$%
 
 # compare the two
 pubchem %>% 
-    full_join(CTS) %>% 
-    rename(InChIKey_CTS = value) %>%
-    mutate(Diff = if_else(InChIKey == InChIKey_CTS, 'Same', 'Diff')) %>% 
-    select(name, PubChemID=CID, InChIKey, InChIKey_CTS, 
-           Diff, InChI, IsomericSMILES, CanonicalSMILES) %>%
+  full_join(CTS) %>% 
+  rename(InChIKey_CTS = value) %>%
+  mutate(Diff = if_else(InChIKey == InChIKey_CTS, 'Same', 'Diff')) %>% 
+  select(name, PubChemID=CID, InChIKey, InChIKey_CTS, 
+         Diff, InChI, IsomericSMILES, CanonicalSMILES) %>%
   write_csv('~/Downloads/eric-cts-vs-pubchem.csv')
 
 
+
+# Hand cleaned data-set
+final.chems <- read_csv('./final-chems.csv')
+
+# Rishi's data (fix some names to key)
+or.hits <- read_csv('AllORHits.csv') %>%
+  mutate(Odorant = case_when(
+    Odorant == 'ethyl maltol' ~ 'Ethyl Maltol',
+    Odorant ==  " (R)-(+)-Limonene" ~ '(R)-(+)-Limonene', # still doesnt quite work..
+    TRUE ~ Odorant
+  ))
+
+# output the or's excluding the NA's
+or.hits %>% 
+  rename(name = Odorant) %>% 
+  left_join(final.chems) %>% 
+  select(OR, name, min_activating_conc, InChIKey, InChI) %>%
+  filter(!is.na(InChIKey)) %>% 
+  arrange(OR) %>%
+  write_csv('./ors-inchi-rishi.csv')
+
+```
+
+Latent space analysis
+```{r}
 latent.mat <- read_csv('~/Downloads/latent-mat.csv', col_names = F)
 olf.smiles <- read_csv('~/Downloads/olf-smiles.csv', col_names = T) 
 
@@ -52,6 +77,4 @@ latent.mat %>%
     dist() %>%
     hclust() %>%
     plot()
-
-or.chems <- read_csv('~/Downloads/AllORHits.csv')
 ```
