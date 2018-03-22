@@ -20,17 +20,26 @@ pubchem <- or.chems %$%
   unlist() %>% 
   enframe() %>% 
   nest() %>% 
-  mutate(foo = map(data, ~pc_prop(.x$value, properties = c('InChIKey', 'CanonicalSMILES', 'IsomericSMILES')))) %>%
+  mutate(foo = map(data, ~pc_prop(.x$value, properties = c('InChIKey', 'InChI', 'CanonicalSMILES', 'IsomericSMILES')))) %>%
   unnest() %>%
   select(-value)
 
 write_csv(pubchem, '~/Downloads/pubchem-eric.csv')
 
 # use the chemical translation service
-foo <-  or.chems %$% 
+CTS <-  or.chems %$% 
   cts_convert(`Chemical Name`, 'Chemical Name', 'InChIKey') %>%
   unlist() %>% 
   enframe()
+
+# compare the two
+pubchem %>% 
+    full_join(CTS) %>% 
+    rename(InChIKey_CTS = value) %>%
+    mutate(Diff = if_else(InChIKey == InChIKey_CTS, 'Same', 'Diff')) %>% 
+    select(name, PubChemID=CID, InChIKey, InChIKey_CTS, 
+           Diff, InChI, IsomericSMILES, CanonicalSMILES) %>%
+  write_csv('~/Downloads/eric-cts-vs-pubchem.csv')
 
 
 latent.mat <- read_csv('~/Downloads/latent-mat.csv', col_names = F)
