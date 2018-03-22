@@ -1,0 +1,48 @@
+---
+title: "Odorant Clustering"
+output: html_notebook
+---
+
+```{r, loading}
+# tidyverse
+require(webchem)
+require(stringr)
+require(broom)
+require(forcats)
+require(magrittr)
+require(tidyverse)
+
+or.chems <- read_csv('ChemicalList.csv')
+
+# search pubchem by names
+pubchem <- or.chems %$% 
+  get_cid(`Chemical Name`) %>%
+  unlist() %>% 
+  enframe() %>% 
+  nest() %>% 
+  mutate(foo = map(data, ~pc_prop(.x$value, properties = c('InChIKey', 'CanonicalSMILES', 'IsomericSMILES')))) %>%
+  unnest() %>%
+  select(-value)
+
+write_csv(pubchem, '~/Downloads/pubchem-eric.csv')
+
+# use the chemical translation service
+foo <-  or.chems %$% 
+  cts_convert(`Chemical Name`, 'Chemical Name', 'InChIKey') %>%
+  unlist() %>% 
+  enframe()
+
+
+latent.mat <- read_csv('~/Downloads/latent-mat.csv', col_names = F)
+olf.smiles <- read_csv('~/Downloads/olf-smiles.csv', col_names = T) 
+
+latent.mat %>% 
+    bind_cols(olf.smiles %>% select(Odorant), .) %>%
+    as.data.frame() %>%
+    column_to_rownames('Odorant') %>%
+    dist() %>%
+    hclust() %>%
+    plot()
+
+or.chems <- read_csv('~/Downloads/AllORHits.csv')
+```
