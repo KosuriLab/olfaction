@@ -1,6 +1,7 @@
 import json
 import csv
 import numpy as np
+import pandas as pd
 from collections import defaultdict
 from model import MoleculeVAE
 from utils import encode_smiles, decode_latent_molecule, interpolate, get_unique_mols
@@ -24,7 +25,13 @@ model = MoleculeVAE()
 model.load(charset, trained_model, latent_rep_size = latent_dim)
 
 # load the smiles
-with open('../final-chems.csv', 'rU') as csvfile:
-    reader = csv.reader(csvfile)
+with open('../final-chems.tsv', 'r') as csvfile:
+    reader = csv.reader(csvfile, delimiter='\t')
     next(reader) # skip header
-    name_ma = {store[0]:store[1] for store in reader if len(store[2]) > 2}
+    name_map = {store[0]:store[1:] for store in reader if len(store[2]) > 2}
+
+# encode all smiles for all chemicals in our library
+# load everything into a pandas dataframe for downstream procs
+chems, vecs = zip(*[(key, encode_smiles(val[5], model, charset)) for key, val in name_map.items()])
+df = pd.DataFrame(np.concatenate(vecs), dtype='float32', index=chems)
+df.to_csv('../chem-vecs.csv')
