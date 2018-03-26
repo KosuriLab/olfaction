@@ -6,12 +6,17 @@ output: html_notebook
 ```{r, loading}
 # tidyverse
 require(webchem)
+require(factoextra)
 require(stringr)
 require(broom)
 require(forcats)
 require(magrittr)
 require(tidyverse)
+```
 
+First we will convert the names into unique identifiers using a variety of chemical lookup services. 
+
+```{r, name-convert}
 or.chems <- read_csv('ChemicalList.csv')
 
 # search pubchem by names
@@ -40,9 +45,11 @@ pubchem %>%
   select(name, PubChemID=CID, InChIKey, InChIKey_CTS, 
          Diff, InChI, IsomericSMILES, CanonicalSMILES) %>%
   write_csv('~/Downloads/eric-cts-vs-pubchem.csv')
+```
 
+At this point, we had to do some manual cleaning... Load up the finalized data set and link them to Rishi's OR hits
 
-
+```{r, or-hits}
 # Hand cleaned data-set
 final.chems <- read_csv('./final-chems.csv')
 
@@ -62,19 +69,62 @@ or.hits %>%
   filter(!is.na(InChIKey)) %>% 
   arrange(OR) %>%
   write_csv('./ors-inchi-rishi.csv')
-
 ```
 
 Latent space analysis
 ```{r}
-latent.mat <- read_csv('~/Downloads/latent-mat.csv', col_names = F)
-olf.smiles <- read_csv('~/Downloads/olf-smiles.csv', col_names = T) 
+latent.mat <- read_csv('./chem-vecs.csv', col_names = T)
 
+# hclust
 latent.mat %>% 
-    bind_cols(olf.smiles %>% select(Odorant), .) %>%
-    as.data.frame() %>%
-    column_to_rownames('Odorant') %>%
-    dist() %>%
-    hclust() %>%
-    plot()
+  as.data.frame() %>%
+  column_to_rownames('X1') %>%
+  dist() %>%
+  hclust() %>%
+  factoextra::fviz_dend()
+
+# PCA
+latent.mat %>% 
+  as.data.frame() %>%
+  column_to_rownames('X1') %>%
+  prcomp %>%
+  factoextra::fviz_pca_ind(repel = T)
+
+# get the two principle components
+chem.coords <- latent.mat %>% 
+  as.data.frame() %>%
+  column_to_rownames('X1') %>%
+  prcomp %$%
+  x[,1:2] %>%
+  as.data.frame() %>%
+  rownames_to_column(var='name') %>%
+  as_tibble() 
+
+or.hits %>%
+    rename(name = Odorant) %>%
+    inner_join(chem.coords) %>%
+    ggplot(aes(x=PC1, y=PC2)) +
+    geom_point(data=chem.coords, color='grey') +
+    geom_point() +
+    facet_wrap(~OR)
+```
+
+We can also try the dreaded t-sne
+
+```{R, TSNE}
+SNE <- latent.mat %>% 
+  as.data.frame() %>%
+  column_to_rownames('X1') %>%
+  Rtsne::Rtsne() %$%
+  Y %>%
+  as_tibble() %>%
+  bind_cols(latent.mat %>% select(name = X1))
+
+or.hits %>%
+    rename(name = Odorant) %>%
+    inner_join(SNE) %>%
+    ggplot(aes(x=V1, y=V2)) +
+    geom_point(data=SNE, color='grey') +
+    geom_point() +
+    facet_wrap(~OR)
 ```
