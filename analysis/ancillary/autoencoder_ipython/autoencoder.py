@@ -1,7 +1,10 @@
 import json
+import gzip
 import csv
+import random
 import numpy as np
 import pandas as pd
+from sklearn.decomposition import PCA
 from collections import defaultdict
 from model import MoleculeVAE
 from utils import encode_smiles, decode_latent_molecule, interpolate, get_unique_mols
@@ -24,6 +27,8 @@ with open('charset.json', 'r') as outfile:
 model = MoleculeVAE()
 model.load(charset, trained_model, latent_rep_size = latent_dim)
 
+#-------------------------------------------------------------------------------
+
 # load the smiles
 with open('../final-chems.tsv', 'r') as csvfile:
     reader = csv.reader(csvfile, delimiter='\t')
@@ -32,6 +37,21 @@ with open('../final-chems.tsv', 'r') as csvfile:
 
 # encode all smiles for all chemicals in our library
 # load everything into a pandas dataframe for downstream procs
-chems, vecs = zip(*[(key, encode_smiles(val[5], model, charset)) for key, val in name_map.items()])
-df = pd.DataFrame(np.concatenate(vecs), dtype='float32', index=chems)
+lib_chems, lib_vecs = zip(*[(key, encode_smiles(val[5], model, charset)) for key, val in name_map.items()])
+df = pd.DataFrame(np.concatenate(lib_vecs), dtype='float32', index=lib_chems)
 df.to_csv('../chem-vecs.csv')
+
+#-------------------------------------------------------------------------------
+
+# open all of chembl_23 and encode
+with gzip.open('../chembl_23.txt.gz', 'rb') as f:
+    next(f)
+    chembl = dict([line.decode().split() for line in f])
+
+# encoding will take a while
+chems, vecs = zip(*[(key, encode_smiles(val, model, charset)) for key, val in random.sample(chembl.items(), 250000) if len(val) <= 120])
+pca = PCA(2)
+combo = np.concatenate((np.concatenate(vecs), np.concatenate(lib_vecs)))
+df = pd.DataFrame(pca.fit_transform(combo), dtype='float32', index=chems+lib_chems)
+df.to_csv('../latent-space-pca.csv.gz', compression='gzip', header=['PC1', 'PC2'])
+
