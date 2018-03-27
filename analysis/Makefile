@@ -47,6 +47,18 @@ output/idx-bcs-counts.txt: raw-indexes.txt pipeline/pilot-1_idx-bcs.txt.gz pipel
 	parallel zcat $(filter-out $<, $^) \| awk -v idx=\"{}\" \''$$1 == idx {a[$$2]++} END {for(bc in a) print idx, bc, a[bc]}'\' :::: $< > $@
 
 #-------------------------------------------------------------------------------
+
+# 6-well stuff
+output/pilot-1_idx-counts.txt: pipeline/pilot-1_idx-bcs.txt.gz
+	zcat $^ | \
+	    awk '{a[$$1]++} END {for(idx in a) print idx, a[idx]}' | \
+	    sort -rnk2 > $@
+
+output/pilot-1_idx-bcs.counts.txt: raw-indexes.txt pipeline/pilot-1_idx-bcs.txt.gz
+	parallel zcat $(filter-out $<, $^) \| awk -v idx=\"{}\" \''$$1 == idx {a[$$2]++} END {for(bc in a) print idx, bc, a[bc]}'\' :::: $< > $@
+
+
+#-------------------------------------------------------------------------------
 # 96-well stuff
 
 # count all indexes
