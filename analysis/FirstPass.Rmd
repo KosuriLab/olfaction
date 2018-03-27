@@ -210,3 +210,23 @@ or.counts.96well %>%
   labs(y = 'Treatment')
 ```
 
+# 6-well data
+```{r, 6-well}
+counts.per.idx.6well <- read_delim(
+  './output/pilot-1_idx-bcs.counts.txt', 
+  delim = ' ',
+  col_names = c('Index', 'Barcode', 'Count')
+)
+
+idx.counts.6well <- read_delim(
+  './output/pilot-1_idx-counts.txt',
+  delim = ' ',
+  col_names = c('Index', 'Reads')
+) %>%
+  inner_join(read_delim('index-key.txt', delim = ' '))
+
+# get the ors
+ors.6well <- counts.per.idx.6well %>%
+    inner_join(idx.counts.6well) %>%
+    inner_join(or.key)
+```
