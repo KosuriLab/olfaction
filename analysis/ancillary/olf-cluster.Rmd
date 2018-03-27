@@ -111,7 +111,7 @@ or.hits %>%
 
 We can also try the dreaded t-sne
 
-```{R, TSNE}
+```{r, TSNE}
 SNE <- latent.mat %>% 
   as.data.frame() %>%
   column_to_rownames('X1') %>%
@@ -125,6 +125,30 @@ or.hits %>%
     inner_join(SNE) %>%
     ggplot(aes(x=V1, y=V2)) +
     geom_point(data=SNE, color='grey') +
+    geom_point() +
+    facet_wrap(~OR)
+```
+
+Let's see where our chemicals map globally
+
+```{r, global-landscape}
+global.pca <- read_csv('./latent-space-pca.csv.gz') %>%
+  rename(name = X1) %>%
+  mutate(Lib = if_else(str_detect(name, 'CHEM'), 'No', 'Yes')) 
+
+# where do our chemicals lay in space
+global.pca %>%
+    mutate(Lib = if_else(str_detect(name, 'CHEM'), 'No', 'Yes')) %>% 
+    ggplot(aes(x=PC1, y=PC2)) +
+    geom_point(alpha=0.01) +
+    geom_point(data=. %>% filter(Lib == 'Yes'), color='red')
+
+# where do our hits lay wrt the global space for each or?
+or.hits %>%
+    rename(name = Odorant) %>% 
+    inner_join(global.pca) %>%
+    ggplot(aes(x=PC1, y=PC2)) +
+    geom_point(data=global.pca %>% filter(Lib == 'Yes'), color='grey') +
     geom_point() +
     facet_wrap(~OR)
 ```
