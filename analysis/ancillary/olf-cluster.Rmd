@@ -12,6 +12,42 @@ require(broom)
 require(forcats)
 require(magrittr)
 require(tidyverse)
+
+theme_pub <- function(base_size = 13, base_family = "") {
+  require(grid)
+  # based on https://github.com/noamross/noamtools/blob/master/R/theme_nr.R
+  # start with theme_bw and modify from there!
+  theme_bw(base_size = base_size, base_family = base_family) +# %+replace%
+    theme(
+      # grid lines
+      panel.grid.major.x = element_line(colour="#ECECEC", size=0.5, linetype=1),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.minor.y = element_blank(),
+      panel.grid.major.y = element_line(colour="#ECECEC", size=0.5, linetype=1),
+      panel.background   = element_blank(),
+      
+      # axis options
+      axis.ticks.y   = element_blank(),
+      axis.title.x   = element_text(size=rel(2.25), vjust=0.25),
+      axis.title.y   = element_text(size=rel(2.25), vjust=0.35),
+      axis.text      = element_text(color="black", size=rel(1.5)),
+      
+      # legend options
+      legend.title    = element_blank(),
+      legend.key      = element_rect(fill="white"),
+      legend.key.size = unit(1, "cm"),
+      legend.text     = element_text(size=rel(2)),
+      
+      # facet options
+      strip.text = element_text(size=rel(2)),
+      
+      # title options
+      plot.title = element_text(size=rel(3), vjust=0.25, hjust=0.5)
+    )
+}
+
+# set the theme and brewer color
+theme_set(theme_pub())
 ```
 
 First we will convert the names into unique identifiers using a variety of chemical lookup services. 
@@ -138,17 +174,49 @@ global.pca <- read_csv('./latent-space-pca.csv.gz') %>%
 
 # where do our chemicals lay in space
 global.pca %>%
-    mutate(Lib = if_else(str_detect(name, 'CHEM'), 'No', 'Yes')) %>% 
-    ggplot(aes(x=PC1, y=PC2)) +
-    geom_point(alpha=0.01) +
-    geom_point(data=. %>% filter(Lib == 'Yes'), color='red')
+  mutate(Lib = if_else(str_detect(name, 'CHEM'), 'No', 'Yes')) %>% 
+  ggplot(aes(x=PC1, y=PC2)) +
+  geom_point(alpha=0.01) +
+  geom_point(data=. %>% filter(Lib == 'Yes'), color='red')
 
 # where do our hits lay wrt the global space for each or?
+# same scheme as heatmap
 or.hits %>%
-    rename(name = Odorant) %>% 
-    inner_join(global.pca) %>%
-    ggplot(aes(x=PC1, y=PC2)) +
-    geom_point(data=global.pca %>% filter(Lib == 'Yes'), color='grey') +
-    geom_point() +
-    facet_wrap(~OR)
+  rename(name = Odorant, act = min_activating_conc) %>% 
+  inner_join(global.pca, by = 'name') %>%
+  ggplot(aes(x=PC1, y=PC2)) +
+  geom_point(
+    data=global.pca %>% filter(Lib == 'Yes'), 
+    pch=21, 
+    fill='#EFF3FF',
+    color='black'
+  ) +
+  geom_point(
+    pch=21, 
+    aes(fill=as.character(act))
+  ) +
+  facet_wrap(~OR) +
+  scale_fill_manual(values = c('#08306b','#4292c6','#bdd7e7')) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    strip.background = element_blank(),
+    legend.position = 'bottom'
+  )
+
+# nates color
+or.hits %>%
+  rename(name = Odorant, act = min_activating_conc) %>% 
+  inner_join(global.pca, by = 'name') %>%
+  ggplot(aes(x=PC1, y=PC2)) +
+  geom_point(data=global.pca %>% filter(Lib == 'Yes'), color='grey') +
+  geom_point() + #aes(color=as.character(act))) +
+  facet_wrap(~OR) +
+  # scale_color_manual(values = c('#225ea8','#41b6c4','#a1dab4')) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    strip.background = element_blank(),
+    legend.position = 'bottom'
+  )
 ```
