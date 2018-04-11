@@ -7,6 +7,7 @@ output: html_notebook
 # tidyverse
 require(webchem)
 require(factoextra)
+require(ggrepel)
 require(stringr)
 require(broom)
 require(forcats)
@@ -177,6 +178,14 @@ global.pca %>%
   mutate(Lib = if_else(str_detect(name, 'CHEM'), 'No', 'Yes')) %>% 
   ggplot(aes(x=PC1, y=PC2)) +
   geom_point(alpha=0.01) +
+  geom_text_repel(
+    data=global.pca %>% filter(Lib == 'Yes'), 
+    aes(label = name), 
+    force=3,
+    segment.color = '#e4acac',
+    max.iter=5000,
+    box.padding = 0.5
+  ) +
   geom_point(data=. %>% filter(Lib == 'Yes'), color='red')
 
 # where do our hits lay wrt the global space for each or?
