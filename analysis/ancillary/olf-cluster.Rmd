@@ -177,7 +177,7 @@ global.pca <- read_csv('./latent-space-pca.csv.gz') %>%
 global.pca %>%
   mutate(Lib = if_else(str_detect(name, 'CHEM'), 'No', 'Yes')) %>% 
   ggplot(aes(x=PC1, y=PC2)) +
-  geom_point(alpha=0.01) +
+  geom_point(alpha=0.05, color = "#64acbe") +
   geom_text_repel(
     data=global.pca %>% filter(Lib == 'Yes'), 
     aes(label = name), 
@@ -186,7 +186,11 @@ global.pca %>%
     max.iter=5000,
     box.padding = 0.5
   ) +
-  geom_point(data=. %>% filter(Lib == 'Yes'), color='red')
+  geom_point(data=. %>% filter(Lib == 'Yes'), color='red') +
+  labs(
+    x = 'Chemical Space PC1',
+    y = 'Chemical Space PC2'
+  )
 
 # where do our hits lay wrt the global space for each or?
 # same scheme as heatmap
