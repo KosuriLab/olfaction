@@ -10,6 +10,9 @@ from model import MoleculeVAE
 from utils import encode_smiles, decode_latent_molecule, interpolate, get_unique_mols
 # since getting ipynb's up and running on servers is painful, do it the oldfashioned way
 
+# make sampling reproducible
+random.seed(2813308004)
+
 
 # number of dimensions to represent the molecules
 # as the model was trained with this number, any operation made with the model must share the dimensions.
@@ -46,10 +49,10 @@ df.to_csv('../chem-vecs.csv')
 # open all of chembl_23 and encode
 with gzip.open('../chembl_23.txt.gz', 'rb') as f:
     next(f)
-    chembl = dict([line.decode().split() for line in f])
+    chembl = [line.decode().split() for line in f]
 
 # encoding will take a while
-chems, vecs = zip(*[(key, encode_smiles(val, model, charset)) for key, val in random.sample(chembl.items(), 250000) if len(val) <= 120])
+chems, vecs = zip(*[(key, encode_smiles(val, model, charset)) for key, val in random.sample(chembl, 250000) if len(val) <= 120])
 pca = PCA(2)
 combo = np.concatenate((np.concatenate(vecs), np.concatenate(lib_vecs)))
 df = pd.DataFrame(pca.fit_transform(combo), dtype='float32', index=chems+lib_chems)
