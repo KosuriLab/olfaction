@@ -83,10 +83,10 @@ or.hits %>%
 We then output this to a nice CSV that our python script can read in to plot the structures and their minimum activating concentration.
 
 # Global Chemical Space Analysis
-Let's see where our chemicals map globally. First run everything through the autoencoder (`./molecular_autoencoder/autoencoder.py`)
+Let's see where our chemicals map globally. Make sure to run everything through the autoencoder (`./autoencoder_ipython/autoencoder.py`) first
 
 ```{r, global-landscape}
-global.pca <- read_csv('./latent-space-pca.csv.gz') %>%
+global.pca.2 <- read_csv('./latent-space-pca.csv.gz') %>%
   rename(name = X1) %>%
   mutate(Lib = if_else(str_detect(name, 'CHEM'), 'No', 'Yes')) 
 
