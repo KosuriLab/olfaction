@@ -6,8 +6,13 @@ OR,Odorant,min_activating_conc
 119_1,Furfuryl methyl disulfide,1e3
 119_1,n-Decyl acetate,100
 120_1,Cedryl acetate,1e3
+120_1,Lyral,1e3
 120_1,Nonanethiol,1e3
+13_1,Benzaldehyde,1e3
 13_1,Cyclobutanecarboxylic acid,1e3
+13_1,Pentanoic Acid,1e3
+13_1,trans-2-Methyl-2-butenal (2MB),1e3
+131_1_2,(-)-Perillaaldehyde,1e3
 131_1_2,1-hexanol,1e3
 131_1_2,"3,4-Hexanedione",1e3
 131_1_2,galaxolide,1e3
@@ -20,13 +25,17 @@ OR,Odorant,min_activating_conc
 136_1,2-Ethylphenol,100
 136_1,Olibanum Coeur MD,1e3
 139_1,(-)-Dihydrocarveol,1e3
+139_1,(+)-Dihydrocarvone,1e3
 139_1,(+)-Pulegone,1e3
+139_1,2-sec-Butyl-3-methoxypyrazine,1e3
 139_1,4-Chromanone,1e3
+139_1,beta-ionone,1e3
 139_1,Butanal,1e3
 139_1,Dihydrojasmone,1e3
 139_1,Dimethyl anthranilate,1e3
 139_1,Eugenol,1e3
 139_1,Eugenol methyl ether,1e3
+139_1,helional,1e3
 139_1,Methyl eugenol,1e3
 139_1,Neryl isobutyrate,1e3
 139_1,"Quinoline (1-Benzazine;  2,3-Benzopyridine)",100
@@ -35,8 +44,10 @@ OR,Odorant,min_activating_conc
 158_1,Iso E Super,1e3
 165_1,decanedioic acid (sebacic acid),1e3
 165_1,Octyl formate,1e3
+170_1,2-Bromohexanoic acid,1e3
 170_1,2-Phenethyl acetate,1e3
 170_1,4-Chromanone,100
+170_1,4-Ethylphenol,1e3
 170_1,Anisaldehyde,1e3
 170_1,Benzyl acetate,1e3
 170_1,benzyl benzoate (Pentamethylbenzaldehyde),10
@@ -49,7 +60,7 @@ OR,Odorant,min_activating_conc
 170_1,Methyl eugenol,1e3
 170_1,Piperonal,1e3
 170_1,Piperonyl acetate,1e3
-170_1,"Quinoline (1-Benzazine;  2,3-Benzopyridine)",1e3
+170_1,"Quinoline (1-Benzazine;  2,3-Benzopyridine)",100
 170_1,Vanillin,1e3
 180_1,a-Amylcinnamaldehyde dimethyl acetal,1e3
 180_1,Axe (10 uM),1e3
@@ -63,12 +74,15 @@ OR,Odorant,min_activating_conc
 19_1,Benzyl salicylate,10
 19_1,Methyl salicylate,1e3
 199_1,ethyl maltol,100
+203_1,helional,1e3
 203_1,Piperonyl acetate,1e3
 208_1,Cedryl acetate,1e3
 23_1_2,2-Bromooctanoic acid,1e3
 23_1_2,6-Bromohexanoic acid,100
+23_1_2,Heptanal,1e3
 23_1_2,Hexanoic Acid,1e3
 23_1_2,Nonanal,1e3
+23_1_2,Nonanoic Acid,1e3
 23_1_2,Octanal,100
 25_1,(-)-Carvone,1e3
 25_1,Decanal,1e3
@@ -94,6 +108,8 @@ OR,Odorant,min_activating_conc
 5_1,Olibanum Coeur MD,1e3
 62,2_coumaranone,1e3
 62,Benzaldehyde,1e3
+62,Benzophenone,1e3
+62,ethyl maltol,1e3
 62,Piperonal,1e3
 62,"Quinoline (1-Benzazine;  2,3-Benzopyridine)",1e3
 9_1,galaxolide,1e3
