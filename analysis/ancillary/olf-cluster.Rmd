@@ -86,7 +86,7 @@ We then output this to a nice CSV that our python script can read in to plot the
 Let's see where our chemicals map globally. Make sure to run everything through the autoencoder (`./autoencoder_ipython/autoencoder.py`) first
 
 ```{r, global-landscape}
-global.pca.2 <- read_csv('./latent-space-pca.csv.gz') %>%
+global.pca <- read_csv('./latent-space-pca.csv.gz') %>%
   rename(name = X1) %>%
   mutate(Lib = if_else(str_detect(name, 'CHEM'), 'No', 'Yes')) 
 
@@ -95,7 +95,7 @@ global.pca %>%
   mutate(Lib = if_else(str_detect(name, 'CHEM'), 'No', 'Yes')) %>% 
   ggplot(aes(x=PC1, y=PC2)) +
   geom_point(alpha=0.05, color = "#64acbe") +
-  geom_text_repel(
+  ggrepel::geom_text_repel(
     data=global.pca %>% filter(Lib == 'Yes'), 
     aes(label = name), 
     force=3,
