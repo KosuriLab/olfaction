@@ -1,0 +1,1140 @@
+---
+title: "OlfactionCodeToPublish"
+author: "Rishi Jajoo"
+date: "2/21/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+
+# Initializations
+
+#library(fields)
+library(png)
+library(caTools)
+library(cowplot)
+library(scales) # for oob=squish trick (see: https://github.com/tidyverse/ggplot2/issues/866)
+library(viridis) # pretty scales!
+library(MASS)
+library(stringr)
+library(magrittr)
+library(modelr)
+library(tidyverse)
+library(forcats)
+library(reldist)
+library(reshape2)
+library(readxl)
+library(heatmaply)
+library(RColorBrewer)
+library(seriation)
+library(gplots)
+library(FactoMineR)
+library(edgeR)
+library(statmod)
+library(matrixStats)
+library(readxl)
+
+
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r Six-well Preliminaries,  eval=TRUE, echo=FALSE}
+
+
+df <- read_csv("SixWellAll.csv")
+
+df$Conc_uM[df$Conc=="100uM"]<-100;
+df$Conc_uM[df$Conc=="1mM"]<-1000;
+df$Conc_uM[df$Conc=="0mM"]<-0;
+df$Conc_uM <- as.numeric(df$Conc_uM)
+
+
+df <- df %>% dplyr::select(-Conc)
+
+
+AllWellTotals<-df %>% group_by(Index) %>% summarize(well_total=sum(Count))
+
+df <-left_join(df,AllWellTotals, by="Index")
+
+df <- df %>% mutate(freq=Count/well_total) %>% dplyr::select(-Reads, -Index, -Barcode, -Count, -well_total)
+
+OR_Rep <- df %>% filter(Drug=="Negative") %>% group_by(OR) %>% summarize(PopFreq=mean(freq))  
+
+df <- left_join(df,OR_Rep, by ="OR") %>% mutate(Activation=freq/PopFreq)
+
+Medians <- df %>% group_by(Drug, Repeat, Conc_uM) %>% summarise(MedianActivation=median(Activation, na.rm=TRUE))
+
+df <- left_join(df,Medians, by=c("Drug", "Repeat", "Conc_uM")) %>% mutate(MedianNormalizedActivation = Activation/MedianActivation)
+
+
+df_Normed <- df %>% dplyr::select(-freq, -PopFreq, -Activation, -MedianActivation)
+
+
+Compact_df <- df_Normed %>% mutate(RepeatLabel=paste0("Rep", Repeat)) %>% dplyr::select(-Repeat) %>% spread(RepeatLabel, MedianNormalizedActivation)
+
+Compact_df<- Compact_df %>% mutate(Avg_Normed_Activation = (Rep1+Rep2)/2) %>% dplyr::select(-Rep1, -Rep2, )
+
+Compact_df <- Compact_df %>% mutate(Combined_Condition=paste0(Drug, ", ",Conc_uM, " uM")) %>% dplyr::select(-Drug, -Conc_uM)
+
+
+```
+
+
+```{r Fig1C,  eval=TRUE, echo=FALSE}
+
+lseq <- function(from=1, to=100000, length.out=6) {
+  # logarithmic spaced sequence
+  # blatantly stolen from library("emdbook"), because need only this
+  exp(seq(log(from), log(to), length.out = length.out))
+}
+
+gg=tibble(x=lseq(from = 0.000001, to = .5, length.out=50 ))
+
+
+df %>% filter(Drug=="2-coumeronone", Repeat==1, Conc_uM==1000) %>%
+  ggplot(aes(x=PopFreq, y= freq/MedianActivation))+geom_point()+
+  labs(x="Proportion of Reads in Control", y="Proportion of Reads \n in 1 mM 2-coumaranone")+
+  geom_line(data=gg, aes(x=x,y=x)) +
+  geom_line(data=gg, aes(x=x,y=5*x),linetype = 2) +
+  geom_line(data=gg, aes(x=x,y=x/5),linetype = 2) +
+  scale_x_continuous(trans='log10', limits=c(0.0001 , .2)) +
+  scale_y_continuous(trans='log10', limits=c(0.0001 , .5))
+
+ggsave("Fig1C.pdf", width=5, height=5,units="in")
+
+
+```
+
+
+```{r Fig1D,  eval=TRUE, echo=FALSE}
+
+#representation of ORs in DMSO condition
+
+#take out certain data that are unreliable or don't have replicates
+
+
+#order conditions to display
+
+
+Compact_df$Combined_Condition<- factor(Compact_df$Combined_Condition, levels = as.character(unique(Compact_df$Combined_Condition)))
+
+#reorder factors for display
+OrderedConditions<-c("Negative, 0 uM", "Acetophenone, 100 uM", "Acetophenone, 1000 uM","Carvone, 100 uM", "Carvone, 1000 uM" , "2-coumeronone, 100 uM", "2-coumeronone, 1000 uM","Decanoic_Acid, 100 uM","Decanoic_Acid, 1000 uM","Fenchone, 100 uM","Fenchone, 1000 uM", "Heptanoic_Acid, 100 uM", "Heptanoic_Acid, 1000 uM","Octanoic_Acid, 100 uM" , "Octanoic_Acid, 1000 uM", "Prenyl_Acetate, 100 uM",  "Prenyl_Acetate, 1000 uM","Vanillic_Acid, 100 uM" ,  "Vanillic_Acid, 1000 uM", "2-coumeronone+Decanoic_Acid, 100 uM", "2-coumeronone+Decanoic_Acid+Acetophenone, 100 uM")
+
+
+Compact_df$Combined_Condition <- fct_relevel(Compact_df$Combined_Condition,OrderedConditions)
+
+
+Compact_df <- Compact_df %>% filter(Combined_Condition !="2-coumeronone, 100 uM", !(OR %in% c("172_1","176_1","181_1","131_1")))  #filter out certain ORs because of low covereage or duplication
+
+
+Compact_df$OR<-gsub("_", "-", Compact_df$OR)#change the name of some variables to make them easier to read
+
+Compact_df<-Compact_df %>% mutate(OR=paste0("MOR",OR)) 
+
+Compact_df$OR[Compact_df$OR=="MOR62"]<-"Olfr62"
+
+Compact_df$OR[Compact_df$OR=="MOR131-1-2"]<-"MOR131-1"
+
+df_Matrix <- Compact_df %>% spread(key = OR, Avg_Normed_Activation)
+
+
+
+row.names(df_Matrix) <- as.character(df_Matrix$Combined_Condition)
+
+
+df_Matrix <- df_Matrix %>% dplyr::select(-Combined_Condition) 
+
+color <- colorRampPalette(brewer.pal(9, "Blues"))(100);
+
+color[1]="#FFFFFF"
+
+pdf(file="Fig1D.pdf", width = 10, height = 5)
+heatmap.2(as.matrix(log2(df_Matrix)), Colv=FALSE, Rowv=FALSE, margins=c(3,10), density.info="none", scale="none", xlab="OR", ylab="Odorants", trace="none", col=bluered(75), cexRow=.7, offsetRow =-.4, offsetCol =-.55,cexCol=.6, srtCol = 45)
+
+#, labCol="",labRow="", add.expr = text(x = c(rep(c(35,35),ceiling(length(rownames(Distinct_Combos_Matrix))/2))) , y= seq_along(rownames(Distinct_Combos_Matrix)) ,adj = c(0, NA), labels=rownames(Distinct_Combos_Matrix), xpd=NA,cex=.5))
+
+
+#text(x = (seq_along(colnames(Distinct_Combos_Matrix))-.7), y=-3, srt=45, labels=colnames(Distinct_Combos_Matrix), xpd=NA,cex=0.4)
+
+dev.off()
+
+
+```
+```{r FigS3BCD,  eval=TRUE, echo=FALSE}
+
+ ComparisonDataAll <- read_csv("AllInteractionData.csv", 
+    col_types = cols(plate = col_character()))
+
+ComparisonDataAll %>% filter(Odorant=="DMSO",plate==8) %>% ggplot(aes(x=OR, y=Rep1)) +
+  geom_bar(stat="identity")+theme(axis.text.x=element_text(angle = -90, hjust = 0,vjust=0)) + labs(x = "Olfactory Receptor", y="Sequence Counts", title = "DMSO Treatment")
+
+ggsave("FigS3B.pdf",width=8, height=5,units="in")
+
+
+ComparisonDataAll %>% filter(Odorant=="2_coumaranone", Concentration_uM==1000) %>% ggplot(aes(x=OR, y=Rep1)) +
+  geom_bar(stat="identity")+theme(axis.text.x=element_text(angle = -90, hjust = 0,vjust=0))+ labs(x = "Olfactory Receptor", y="Sequence Counts",title = "2-Coumaranone Treatment")
+
+ggsave("FigS3C.pdf",width=8, height=5,units="in")
+
+
+DMSO_plate8<-ComparisonDataAll %>% filter(Odorant=="DMSO",plate==8) %>% gather(key="RepNumbers",value="Freq",rep2_freq) %>% spread(key="Odorant",value="Freq") %>% select(OR,RepNumbers,DMSO)
+
+
+Coum1000<-ComparisonDataAll %>% filter(Odorant=="2_coumaranone", Concentration_uM==1000) %>% gather(key="RepNumbers",value="Freq",rep2_freq) %>% spread(key="Odorant",value="Freq") %>% select(OR,RepNumbers,`2_coumaranone`)
+
+
+DMSO_coum<-full_join(DMSO_plate8,Coum1000, by=c("OR", "RepNumbers")) 
+
+
+lseq <- function(from=1, to=100000, length.out=6) {
+  # logarithmic spaced sequence
+  # blatantly stolen from library("emdbook"), because need only this
+  exp(seq(log(from), log(to), length.out = length.out))
+}
+
+
+gg=tibble(x=lseq(from = 0.000001, to = .5, length.out=50 ))
+
+DMSO_coum%>% ggplot(aes(x=DMSO, y=`2_coumaranone`)) +
+    geom_point()+geom_abline(slope=1,intercept=0)+ labs(x = "Proportion of reads after DMSO treatment", y="Proportion of reads after 1mM 2-Coumaranone treatment") + 
+  geom_line(data=gg, aes(x=x,y=x)) +
+  geom_line(data=gg, aes(x=x,y=5*x),linetype = 2) +
+  geom_line(data=gg, aes(x=x,y=x/5),linetype = 2) +
+  scale_x_continuous(trans='log10', limits=c(0.0001 , .2)) +
+  scale_y_continuous(trans='log10', limits=c(0.0001 , .5))
+
+
+ggsave("FigS3D.pdf",width=8, height=5,units="in")
+
+
+
+```
+
+
+```{r FigS3E,  eval=TRUE, echo=FALSE}
+
+Well_Data <- read_csv("ManyConcentrationPlate.csv")
+
+Well_Data <- Well_Data %>% 
+  mutate(ReplicateNumber = variable) %>% 
+  select(-variable)
+
+
+#Normalize Reads
+Well_readstealing <- Well_Data %>% group_by(Treatment, Concentration_uM,ReplicateNumber) %>% summarise(Nonstollen_reads= median(Freq/Normalization, na.rm=TRUE))
+
+
+Well_Data<-left_join(Well_Data,Well_readstealing, by=c("Treatment", "Concentration_uM","ReplicateNumber")) %>% mutate(corrected_fold_induction=(Freq/Nonstollen_reads)/Normalization)
+           
+
+Decanoic_30_1_SeqData <- Well_Data %>% filter(Treatment =="Decanoic_Acid", OR =="30_1") %>% transmute(Concentration_uM=Concentration_uM, NormalizedActivation = corrected_fold_induction, Source = "Sequencing")
+
+
+Vanillic_9_1_SeqData <- Well_Data %>% filter(Treatment =="Vanillic_Acid", OR =="9_1") %>% transmute(Concentration_uM=Concentration_uM, NormalizedActivation = corrected_fold_induction, Source = "Sequencing")
+
+Coumaranone_6_2_SeqData <- Well_Data %>% filter(Treatment =="2-Coumaranone", OR =="62") %>% transmute(Concentration_uM=Concentration_uM, NormalizedActivation = corrected_fold_induction, Source = "Sequencing")
+
+
+
+
+AllTreatments=c("2-Coumaranone","Acetophenone","Decanoic_Acid","Prenyl_Acetate", "Vanillic_Acid")
+
+
+for (i in 1:length(AllTreatments))
+     {
+
+  CurrentTreatment <- AllTreatments[i]
+  
+  if(CurrentTreatment=="2-Coumaranone")  HighlightORs=c("62")
+  if(CurrentTreatment=="Acetophenone")  HighlightORs=c("170_1")
+  if(CurrentTreatment=="Vanillic_Acid")  HighlightORs=c("9_1")
+  if(CurrentTreatment=="Decanoic_Acid")  HighlightORs=c("30_1","23_1_2","25_1","5_1")
+
+  
+      Treatment_df <- Well_Data %>% 
+          filter(Treatment==CurrentTreatment)
+      
+    #need another df for just the specific OR  
+  Highlight_df <- Treatment_df %>% filter(OR %in% HighlightORs)
+  
+      print(
+     
+         ggplot(NULL, aes(x=Concentration_uM, y=corrected_fold_induction, group=OR)) + geom_point(data=Treatment_df, color="grey50",alpha=.5) + stat_summary(data=Treatment_df,aes(y = corrected_fold_induction), fun.y=mean, geom="line", color="grey50",alpha=.5) + geom_point(data=Highlight_df,aes(x=Concentration_uM, y=corrected_fold_induction, color=OR))+ stat_summary(data=Highlight_df, aes(y = corrected_fold_induction, color=OR), fun.y=mean, geom="line") + labs(x=paste(CurrentTreatment,"[uM]"), y = "Fold Activation") + scale_x_continuous(trans = "log10", breaks=c(1, 10, 100, 1000)) + scale_y_continuous(breaks=c(1,5,10,15, 20,25))+ coord_cartesian(xlim = c(1,1200)) + theme(legend.position = c(0.2, 0.7) )
+         
+       
+            
+      )
+  
+      
+      ggsave(paste("FigS3E_",CurrentTreatment,".pdf",sep=""))
+      
+      
+      
+      
+}
+
+Treatment_df <- Well_Data %>% filter(Treatment=="Forskolin")
+ 
+ggplot(Treatment_df, aes(x=Concentration_uM, y=corrected_fold_induction, group=OR)) + geom_point(data=Treatment_df, color="grey50", alpha=.5) + stat_summary(data=Treatment_df,aes(y = corrected_fold_induction), fun.y=mean, geom="line", color="grey50", alpha=.5) + labs(x="Forskolin [uM]", y = "Fold Activation") + scale_x_continuous(trans = "log10", breaks=c(.01, .1, 1, 10, 100, 100)) + scale_y_continuous(breaks=c(1,5))+ coord_cartesian(xlim = c(0.01,120), ylim=c(0,6))
+
+ggsave("FigS3E_Forksolin_AllORs.pdf")
+
+
+```
+
+
+```{r FigS4ADE,  eval=TRUE, echo=FALSE}
+
+ ComparisonDataAll <- read_csv("AllInteractionData.csv", 
+    col_types = cols(plate = col_character()))
+
+
+#representation of ORs in DMSO condition
+
+
+OR_stats <- ComparisonDataAll %>% filter(Odorant=="DMSO") %>% gather(key="RepNum", value="well_freq",rep1_freq:rep3_freq) %>% group_by(OR) %>% summarize(OverallAverageFreq=mean(well_freq), OverallCV=sd(well_freq)/OverallAverageFreq)
+
+
+OR_stats %>% ggplot(aes(x=OverallAverageFreq)) + geom_histogram(bins=20) + labs(x= "OR Frequency in DMSO", y = "Number of ORs") 
+  
+
+ggsave("FigS4A.pdf",width=8, height=5,units="in")
+
+
+OR_stats %>% ggplot(aes(x=OverallAverageFreq, y=OverallCV)) + geom_point() + labs(y= "CV between wells", x = "Frequency of OR in library") + coord_cartesian(ylim = c(0,1.5)) 
+
+ggsave("FigS4B.pdf",width=8, height=5,units="in")
+
+
+OR_stats %>% ggplot(aes(x=OverallCV)) + geom_histogram(bins=10) + labs(title="Variability between replicates (DMSO control wells) ", x= "OR CV between wells", y = "Number of ORs") 
+#This shows all wells, even the ones that were filtered out and therefore differs from the submitted figure S3C  
+ggsave("FigS4C.pdf",width=8, height=5,units="in")
+
+Replicability <- ComparisonDataAll %>% gather(key="RepNum", value="well_freq",rep1_freq:rep3_freq) %>% group_by(OR,Concentration_uM,Odorant) %>% summarize(OverallAverageFreq=mean(well_freq), OverallCV=sd(well_freq)/OverallAverageFreq)
+
+Replicability %>% ggplot(aes(x=OverallCV)) + geom_histogram(bins=100) + labs(title= "Variability between biological replicates", x= "CV between wells", y = "Number of ORs") 
+
+ggsave("FigS4D.pdf",width=8, height=5,units="in")
+
+
+
+
+#Figure S4E
+
+ControlData <- ComparisonDataAll %>% filter(Odorant %in% c("DMSO","Control_1","Control_2")) %>%
+  gather(key="ReplicateNum",value="freq",rep1_freq:rep2_freq) %>% select(-(Rep1_tot:Rep3_tot),-(Rep1:rep3_freq),-freq_ave,-freq_sd,-(Nonstollen_reads:sd_diff))
+
+CompositionalEffects <- ControlData %>% group_by(Concentration_uM,plate,Odorant,ReplicateNum) %>% summarise(Nonstollen_reads=1/median(freq/population_freq))
+
+ControlData <- left_join(ControlData,CompositionalEffects, by=c("Concentration_uM","plate", "Odorant","ReplicateNum")) %>% mutate(MedianNormalizedActivation=freq/population_freq*Nonstollen_reads)
+
+
+
+ControlData %>% filter(Odorant=="Control_1", OR=="62", is.finite(MedianNormalizedActivation)) %>% ggplot(aes(x=Concentration_uM,y=MedianNormalizedActivation, color=plate)) +geom_point()+stat_summary(aes(y = MedianNormalizedActivation), fun.y=mean, geom="line")+labs(x=paste("2-Coumaranone [uM]"), y = "Fold Activation of OR 62") + scale_x_continuous(trans = "log10", breaks=c(10, 100, 1000)) + scale_y_continuous(breaks=c(1,5,10,15, 20,25))+ coord_cartesian(xlim = c(10, 1200), ylim=c(0,15)) 
+
+ggsave("S4E_Coumaranone.pdf",width=8, height=5,units="in")
+
+
+
+ControlData %>% filter(Odorant=="Control_2", OR %in% c("30_1"),is.finite(MedianNormalizedActivation)) %>% ggplot(aes(x=Concentration_uM,y=freq/population_freq, color=plate)) +geom_point()+stat_summary(aes(y = freq/population_freq), fun.y=mean, geom="line")+labs(x=paste("Decanoic Acid [uM]"), y = "Fold Activation of OR 30-1") + scale_x_continuous(trans = "log10", breaks=c(10, 100, 1000)) + scale_y_continuous(breaks=c(1,5,10,15, 20,25)) + coord_cartesian(xlim = c(10,1200)) 
+
+ggsave("S4E_DecanoicAcid.pdf",width=8, height=5,units="in")
+
+
+```
+
+
+```{r FigS4E,  eval=TRUE, echo=FALSE}
+
+#6 well data
+OR_stats6 <-df %>% filter(Drug=="Negative") %>% group_by(OR) %>% summarize(PopFreq=mean(freq),CV=sd(freq)/mean(freq)) 
+OR_stats6$NumWells=as.factor("6 Well")
+  
+
+#this is the 96 well data
+ComparisonDataAll <- read_csv("AllInteractionData.csv", 
+    col_types = cols(plate = col_character()))
+
+OR_stats96 <- ComparisonDataAll %>% filter(Odorant=="DMSO") %>% gather(key="RepNum", value="well_freq",rep1_freq:rep3_freq) %>% group_by(OR) %>% summarize(PopFreq=mean(well_freq), CV=sd(well_freq)/PopFreq)
+
+
+OR_stats96$NumWells=as.factor("96 Well")
+
+median(OR_stats6$CV)
+
+
+
+SixVs96CV<-rbind(OR_stats6,OR_stats96)
+
+
+
+ggplot(SixVs96CV, aes(x=PopFreq, y = CV, group = OR, color=NumWells )) + 
+  geom_point(size=4) + 
+  geom_path(arrow=arrow(ends="last"),color="black") + labs(x="Frequency of OR in population", y="CV between biological replicates",color="Scale of Experiment")
+
+
+
+
+ggsave("FigS4F.pdf",width=8, height=5,units="in")
+
+```
+
+
+
+```{r Process Data from 20171018,  eval=TRUE, echo=FALSE}
+
+
+#Load in Index1 (96 well code)
+Well_Indexes <- read_csv('20171018_96-well-indexes.csv', col_names = TRUE)
+#Load in Index2 (plate code)
+Plate_Indexes <- read_csv('20171018_plate-indexes.csv', col_names = TRUE)
+
+OR_Barcodes <- read_delim('20171018_barcode-or.txt', " ", col_names = TRUE)
+
+
+idx_bc_matched <- read_csv(file = "20171018_idx_bc_matched.csv") %>% select(-X1)
+
+plate_well_bc <- 
+  idx_bc_matched %>% 
+  left_join(Plate_Indexes, by = c("Index2" = "index_rc")) %>% 
+  left_join(Well_Indexes, by = c("Index1" = "index_rc")) %>% 
+  left_join(OR_Barcodes, by = "Barcode") %>%
+  select(plate, row, col, well, OR, Counts)
+
+
+#arrange the reads in a 96 well order in a matrix
+
+#First, make index1 and and index2 and barcode as factors so we can order them and sort later
+
+plate_well_bc <- plate_well_bc %>% mutate_if(is.character, funs(as.factor))
+
+
+plate_well_bc <- plate_well_bc %>%
+  mutate(plate = factor(plate, levels = Plate_Indexes$plate)) %>% 
+  mutate(well = factor(well, levels = Well_Indexes$well)) %>%  
+  mutate(row = factor(row, levels = unique(Well_Indexes$row))) %>%  
+  mutate(col = factor(col, levels = unique(Well_Indexes$col))) %>%  
+  mutate(OR = factor(OR, levels = OR_Barcodes$OR))
+
+#Plate to Condition mapping
+
+Condition_Map <- read_csv('20171018_Treatment_Plate_Code.csv', col_names = TRUE)
+
+Condition_Map <- Condition_Map %>%
+  mutate(col = factor(col, levels = unique(plate_well_bc$col))) %>% 
+  mutate(row = factor(row, levels = unique(plate_well_bc$row))) %>%
+  mutate(plate = factor(plate, levels = unique(plate_well_bc$plate)))
+  
+
+  
+#right join to throw away stuff we don't have treatment data for right now.
+row_col_cond <- plate_well_bc %>% right_join(Condition_Map, by =c("row","col","plate")) %>% 
+  select(OR, Treatment,Concentration_uM, Replicate, Counts, plate) 
+
+
+
+
+#put replicates together
+cond_rep_counts <- row_col_cond %>% 
+  filter(!is.na(Replicate)) %>%
+  spread(key=Replicate, value=Counts)
+
+cond_rep_counts[is.na(cond_rep_counts)] <- 0
+
+
+#add the well total here
+cond_rep_counts <- 
+  cond_rep_counts %>% 
+  group_by(Treatment, Concentration_uM, plate) %>%
+  summarise(Rep1_tot=sum(Rep1, na.rm = TRUE),Rep2_tot=sum(Rep2, na.rm = TRUE), Rep3_tot=sum(Rep3, na.rm = TRUE)) %>%
+  right_join(cond_rep_counts, by = c("Treatment","Concentration_uM","plate"))
+
+#add frequencies per OR to each well
+cond_rep_counts <- cond_rep_counts %>% mutate(rep1_freq=Rep1/Rep1_tot,rep2_freq=Rep2/Rep2_tot,rep3_freq=Rep3/Rep3_tot)
+
+
+
+#add in average frequency
+cond_rep_counts <- cond_rep_counts %>% 
+  mutate(freq_ave = (rep1_freq+ rep2_freq + rep3_freq)/3, 
+         freq_sd = sqrt(((rep1_freq-freq_ave)^2+(rep2_freq-freq_ave)^2 +(rep3_freq-freq_ave)^2)/(3-1)))
+
+
+DMSO_Data <- cond_rep_counts %>% 
+  ungroup() %>%
+  filter(Treatment=="DMSO") %>% 
+  select(OR, plate, freq_ave, freq_sd) %>%
+  rename(DMSO_ave = freq_ave, DMSO_sd = freq_sd)
+    
+ComparisonData <- left_join(cond_rep_counts,DMSO_Data, by = c("OR","plate"))
+
+#atleast 50% above DMSO control and atleast 3 sd's (where sd is the sd from DMSO and treatment in quadrature; this gives roughly 5% on a one-sided t-table with df=2 ) from DMSO control and the higher concentrations also have to show it.
+
+Odorant_list_cdm <- read_excel("20171018_Odorant_list-cdm.xlsx", 
+    col_types = c("text", "text", "text", 
+        "text","text")) %>% select(ChemNum, Odorant) %>% filter(!is.na(Odorant))
+ 
+
+#average and sd and Add treatment data
+ComparisonData <- ComparisonData %>%
+  mutate(DMSO_Normed = freq_ave/DMSO_ave, overall_sd = DMSO_Normed*sqrt((freq_sd/freq_ave)^2 + (DMSO_sd/DMSO_ave)^2)) %>% left_join(Odorant_list_cdm, by = c("Treatment"="ChemNum")) %>% mutate(Odorant = ifelse(is.na(Odorant), Treatment, Odorant))
+
+
+ ComparisonData<- ComparisonData %>% 
+  select(-DMSO_ave, -DMSO_sd, -DMSO_Normed, -overall_sd, -Treatment) %>%
+  filter(!(OR %in% c("172_1","176_1")))
+  
+DMSO_Data <- ComparisonData %>% filter(Treatment == "DMSO")
+
+ 
+OR_freq <- DMSO_Data %>% 
+  group_by(OR) %>% 
+  summarise(ave=mean(freq_ave), sem =(sqrt(sum(freq_sd^2))/n())/sqrt(n()))
+
+ComparisonData <- ComparisonData %>% left_join(OR_freq, by = "OR") %>% rename (population_freq = ave, population_sem=sem)
+
+
+Well_readstealing <- ComparisonData %>% group_by(Treatment, Concentration_uM, plate) %>% summarise(Nonstollen_reads= median(freq_ave/population_freq, na.rm=TRUE))
+
+
+ComparisonData<-left_join(ComparisonData,Well_readstealing, by=c("Treatment", "Concentration_uM", "plate")) %>% mutate(corrected_fold_induction=(freq_ave/Nonstollen_reads)/population_freq, corrected_fold_induction_sd = corrected_fold_induction*(population_sem/population_freq + (freq_sd/sqrt(3))/freq_ave), sd_diff=(corrected_fold_induction-1)/corrected_fold_induction_sd)
+
+```
+
+```{r Process Data from 20171201,  eval=TRUE, echo=FALSE}
+
+
+#Load in Index1 (96 well code)
+Well_Indexes <- read_csv('20171201_96-well-indexes.csv', col_names = TRUE)
+#Load in Index2 (plate code)
+Plate_Indexes <- read_csv('20171201_plate-indexes.csv', col_names = TRUE)
+
+OR_Barcodes <- read_delim('20171201_barcode-or.txt', " ", col_names = TRUE)
+
+
+idx_bc_matched <- read_csv(file = "20171201_idx_bc_matched.csv") %>% select(-X1)
+
+plate_well_bc <- 
+  idx_bc_matched %>% 
+  left_join(Plate_Indexes, by = c("Index2" = "index_rc")) %>% 
+  left_join(Well_Indexes, by = c("Index1" = "index_rc")) %>% 
+  left_join(OR_Barcodes, by = "Barcode") %>%
+  select(plate, row, col, well, OR, Counts)
+
+
+#arrange the reads in a 96 well order in a matrix
+
+#First, make index1 and and index2 and barcode as factors so we can order them and sort later
+
+plate_well_bc <- plate_well_bc %>% mutate_if(is.character, funs(as.factor))
+
+
+plate_well_bc <- plate_well_bc %>%
+  mutate(plate = factor(plate, levels = Plate_Indexes$plate)) %>% 
+  mutate(well = factor(well, levels = Well_Indexes$well)) %>%  
+  mutate(row = factor(row, levels = unique(Well_Indexes$row))) %>%  
+  mutate(col = factor(col, levels = unique(Well_Indexes$col))) %>%  
+  mutate(OR = factor(OR, levels = OR_Barcodes$OR))
+
+#Plate to Condition mapping
+
+Condition_Map <- read_csv('20171201_Treatment_Plate_Code.csv', col_names = TRUE)
+
+Condition_Map <- Condition_Map %>%
+  mutate(col = factor(col, levels = unique(plate_well_bc$col))) %>% 
+  mutate(row = factor(row, levels = unique(plate_well_bc$row))) %>%
+  mutate(plate = factor(plate, levels = unique(plate_well_bc$plate)))
+  
+
+  
+#right join to throw away stuff we don't have treatment data for right now.
+row_col_cond <- plate_well_bc %>% right_join(Condition_Map, by =c("row","col","plate")) %>% 
+  select(OR, Treatment,Concentration_uM, Replicate, Counts, plate) 
+
+
+
+
+#put replicates together
+cond_rep_counts <- row_col_cond %>% 
+  filter(!is.na(Replicate)) %>%
+  spread(key=Replicate, value=Counts) %>% 
+  select(OR, Treatment, Concentration_uM, plate, Rep1, Rep2, Rep3) #take away the high numbered Reps that are from plate 12
+
+cond_rep_counts[is.na(cond_rep_counts)] <- 0
+
+
+#add the well total here
+cond_rep_counts <- 
+  cond_rep_counts %>% 
+  group_by(Treatment, Concentration_uM, plate) %>%
+  summarise(Rep1_tot=sum(Rep1, na.rm = TRUE),Rep2_tot=sum(Rep2, na.rm = TRUE), Rep3_tot=sum(Rep3, na.rm = TRUE)) %>%
+  right_join(cond_rep_counts, by = c("Treatment","Concentration_uM","plate"))
+
+#add frequencies per OR to each well
+cond_rep_counts <- cond_rep_counts %>% mutate(rep1_freq=Rep1/Rep1_tot,rep2_freq=Rep2/Rep2_tot,rep3_freq=Rep3/Rep3_tot)
+
+
+
+#add in average frequency
+cond_rep_counts <- cond_rep_counts %>% 
+  mutate(freq_ave = (rep1_freq+ rep2_freq + rep3_freq)/3, 
+         freq_sd = sqrt(((rep1_freq-freq_ave)^2+(rep2_freq-freq_ave)^2 +(rep3_freq-freq_ave)^2)/(3-1)))
+
+
+DMSO_Data <- cond_rep_counts %>% 
+  ungroup() %>%
+  filter(Treatment=="DMSO") %>% 
+  select(OR, plate, freq_ave, freq_sd) %>%
+  rename(DMSO_ave = freq_ave, DMSO_sd = freq_sd)
+    
+ComparisonData <- left_join(cond_rep_counts,DMSO_Data, by = c("OR","plate"))
+
+#atleast 50% above DMSO control and atleast 3 sd's (where sd is the sd from DMSO and treatment in quadrature; this gives roughly 5% on a one-sided t-table with df=2 ) from DMSO control and the higher concentrations also have to show it.
+
+OdorantDilutionGuide <- read_excel("~/Dropbox (Personal)/Kosuri Lab/DataAnalysis/20171201_Olf_Screen/OdorantDilutionGuide.xlsx", 
+    col_types = c("text", "numeric", "text", 
+        "text", "text", "numeric", "numeric", 
+        "text", "numeric", "text", "numeric", 
+        "numeric", "text"))
+
+
+OdorantCode <-OdorantDilutionGuide %>%
+  select(ChemNum, Odorant, CAS)
+
+#average and sd and Add treatment data
+
+ComparisonData <- ComparisonData %>%
+  mutate(DMSO_Normed = freq_ave/DMSO_ave, overall_sd = DMSO_Normed*sqrt((freq_sd/freq_ave)^2 + (DMSO_sd/DMSO_ave)^2)) %>% left_join(OdorantCode, by = c("Treatment"="ChemNum")) %>% mutate(Odorant = ifelse(is.na(Odorant), Treatment, Odorant))
+  
+ ComparisonData<- ComparisonData %>% 
+  select(-DMSO_ave, -DMSO_sd, -DMSO_Normed, -overall_sd, -Treatment)
+#  filter(!(OR %in% c("172_1","176_1"))) %>%
+#  filter(!(Treatment %in% c("Control_1","Control_2")))
+  
+DMSO_Data <- ComparisonData %>% filter(Treatment == "DMSO")
+
+ 
+OR_freq <- DMSO_Data %>% 
+  group_by(OR) %>% 
+  summarise(ave=mean(freq_ave), sem =(sqrt(sum(freq_sd^2))/n())/sqrt(n()))
+
+ComparisonData <- ComparisonData %>% left_join(OR_freq, by = "OR") %>% rename (population_freq = ave, population_sem=sem)
+
+
+Well_readstealing <- ComparisonData %>% group_by(Treatment, Concentration_uM, plate) %>% summarise(Nonstollen_reads= median(freq_ave/population_freq, na.rm=TRUE))
+
+
+ComparisonData<-left_join(ComparisonData,Well_readstealing, by=c("Treatment", "Concentration_uM", "plate")) %>% mutate(corrected_fold_induction=(freq_ave/Nonstollen_reads)/population_freq, corrected_fold_induction_sd = corrected_fold_induction*(population_sem/population_freq + (freq_sd/sqrt(3))/freq_ave), sd_diff=(corrected_fold_induction-1)/corrected_fold_induction_sd)
+
+
+
+write_rds(ComparisonData,"ComparisonData20171201.rds")
+
+
+```
+
+```{r EdgeR Data Processing, include=FALSE}
+
+ComparisonData20171018<-read_rds("ComparisonData20171018.rds") %>% mutate(plate=as.character(plate))
+
+ComparisonData20171201<-read_rds("ComparisonData20171201.rds")
+
+
+AllData <- bind_rows(ComparisonData20171018,ComparisonData20171201)
+
+CountData<- AllData %>% mutate(CombinedCondition=paste(Odorant,Concentration_uM,sep=":"))  %>% gather(key="Replicate", value="Counts",Rep1:Rep3) %>% select(CombinedCondition, Counts, OR)
+
+
+OutputDataToPublish<- AllData %>% gather(key="Replicate", value="Counts",Rep1:Rep3) %>% select(Odorant, Concentration_uM, plate, Counts, OR, Replicate)
+
+write_csv(OutputDataToPublish,"AllCountDataToPublish.csv")
+
+
+
+                                
+                                 
+library(readr)
+AllCountDataToPublish <- read_csv("AllCountDataToPublish.csv", 
+    col_types = cols(plate = col_character()))
+
+#number of 
+AllCountDataToPublish %>% filter(!(OR %in% c("181_1", "172_1", "176_1", "131_1")), Odorant != "Methyl eugenol" , !is.na(OR), !is.na(Counts)) %>% group_by() %>% summarize(count=n())
+ 
+
+CountData<- AllData %>% mutate(CombinedCondition=paste(Odorant,Concentration_uM,sep=":"))  %>% gather(key="Replicate", value="Counts",Rep1:Rep3) %>% mutate(CombinedReplicate=paste(plate,Replicate,sep=":")) %>% select(CombinedCondition, Counts, OR,CombinedReplicate)
+
+AllCombinedConditions<-sort(unique(CountData$CombinedCondition))
+
+OR<-sort(unique(CountData$OR))
+
+AllORs_df<-tibble(OR)
+
+
+#make DMSO data part
+
+DMSORunningCountMatrix<-allocMatrix(nrow=length(OR),ncol=1,value=NA)
+
+ DMSO_df<-CountData  %>% filter(CombinedCondition=="DMSO:-999")
+  DMSORepList <- unique(DMSO_df$CombinedReplicate)
+  
+  NumDMSOReps=0
+ for (CurrentRep in DMSORepList) {
+    
+    CurrentRep_df<-DMSO_df  %>% filter(CombinedReplicate==CurrentRep)
+    
+    #if there are any counts in this condition, then add to running matrix
+    if(sum(CurrentRep_df$Counts, na.rm = TRUE)>0)
+    {
+    #make sure that the all ORs are present and that if they are not we have an NA instead of a mis-registered count
+    CurrentRep_df<- left_join(AllORs_df, CurrentRep_df, by="OR") %>% select(Counts)
+    
+    #replaxe NAs with zero
+    CurrentRep_df$Counts<- replace_na(CurrentRep_df$Counts,replace=0)
+    
+   
+      DMSORunningCountMatrix<- cbind(DMSORunningCountMatrix,CurrentRep_df$Counts)
+      NumDMSOReps=NumDMSOReps+1; #keep track of how many replicates each condition has
+
+    }
+ }
+    
+    #take out the first dummy column
+DMSORunningCountMatrix<-DMSORunningCountMatrix[,-1]
+
+
+
+
+
+# Make Combined design matrix
+
+
+TestConditions<-AllCombinedConditions[AllCombinedConditions!="DMSO:-999"]
+NumTestConditions=length(unique(TestConditions))
+
+
+
+
+
+Condition=rep(1,NumDMSOReps)
+ConditionNumber=1;
+#Make a matrix to add the counts
+RunningCountMatrix<-allocMatrix(nrow=length(OR),ncol=1,value=NA)
+
+
+
+for (CurrentCondition in TestConditions) {
+  
+  ConditionNumber=ConditionNumber+1
+  CurrentCondition_df<-CountData  %>% filter(CombinedCondition==CurrentCondition)
+  RepList <- unique(CurrentCondition_df$CombinedReplicate)
+
+  NumReps=0
+
+  for (CurrentRep in RepList) {
+    
+    CurrentRep_df<-CurrentCondition_df  %>% filter(CombinedReplicate==CurrentRep)
+   
+     #if there are any counts in this condition
+      if(sum(CurrentRep_df$Counts, na.rm = TRUE)>0) {    
+      
+      #make sure that the all ORs are present and that if they are not we have an NA instead of a mis-registered count
+        CurrentRep_df<- left_join(AllORs_df, CurrentRep_df, by="OR") %>% select(Counts)
+    
+        CurrentRep_df$Counts<- replace_na(CurrentRep_df$Counts,replace=0)
+    
+        RunningCountMatrix<- cbind(RunningCountMatrix,CurrentRep_df$Counts)
+      
+
+        NumReps=NumReps+1
+      
+    }
+    
+    
+  }
+  
+  Condition=c(Condition,rep(ConditionNumber,NumReps))
+    
+
+
+}
+
+  #delete the first column because it was a dummy colunmn
+RunningCountMatrix<-RunningCountMatrix[,-1]
+
+
+#More stuff for EdgeR}
+
+
+y <- DGEList(counts=cbind(DMSORunningCountMatrix, RunningCountMatrix), genes=AllORs_df$OR)
+
+isexpr <- rowSums(cpm(y)>5000) >=400  #condition for expression to filter out some ORs that don't show up very well
+#so an OR has to be >0.5% in more than 400 samples
+
+y <- y[isexpr, , keep.lib.sizes=FALSE]
+
+y <- calcNormFactors(y)
+
+
+#make as a factor for 
+Condition <- factor(Condition)
+
+
+
+design <- model.matrix(~Condition)  
+rownames(design) <- colnames(y)
+
+y <- estimateDisp(y, design) #this step is computationally intensive
+y$common.dispersion
+y$prior.n
+plotBCV(y)
+fit <- glmFit(y, design, dispersion=y$tagwise.dispersion) # estimate the dispersions only by looking at each gene, not trending toward the common value.
+
+#get out coefs
+
+#change the coefficient each time we go to a new condition
+
+RunningCoefs=matrix(nrow = length(TestConditions)*length(AllORs_df$OR), ncol = 6)
+EndRow=0
+for (i in 1:length(TestConditions))
+{
+  SampleLRT <- glmLRT(fit, coef=i+1)
+
+
+SampleCoefs <- SampleLRT$table
+SampleCoefs <- cbind(SampleCoefs, y$genes$genes,matrix(rep(TestConditions[i],nrow(SampleCoefs)), ncol = 1))
+
+colnames(SampleCoefs)[5] <- "OR"
+colnames(SampleCoefs)[6] <- "Condition"
+
+
+RunningCoefs[(EndRow+1):(EndRow+nrow(SampleCoefs)),]=as.matrix(SampleCoefs)
+
+EndRow=EndRow+nrow(SampleCoefs)
+}
+  
+colnames(RunningCoefs)=colnames(SampleCoefs)
+
+RunningCoefs<-as.tibble(RunningCoefs) %>% filter(!is.na(OR)) %>% mutate(logFC=as.numeric(logFC))
+
+
+RunningCoefs<-RunningCoefs %>% mutate(FDR=p.adjust(RunningCoefs$PValue),method="FDR")
+# adjust p values to correct for multiple hypothesis testing
+
+
+#Compute the individual data values based on logCPM and y$samples$norm.factors
+
+#get rid of entries with low expressed genes.
+isexpr
+
+FreqData<- AllData %>% mutate(CombinedCondition=paste(Odorant,Concentration_uM,sep=":"))  %>% gather(key="Replicate", value="Freq",rep1_freq:rep3_freq) %>% select(CombinedCondition, Freq, OR)
+
+y$genes
+
+# save data
+
+RunningCoefs<-separate(RunningCoefs, Condition, into = c("Odorant","Conc_uM"), sep = ":")
+
+write_csv(RunningCoefs, "EdgeROutput_AllConditions.csv")
+
+
+save(RunningCoefs,y,Condition,AllCombinedConditions, fit,file="EdgeROutputs.RData")
+```
+
+
+
+```{r FigS5}
+load("EdgeROutputs.RData")
+
+RunningCoefs <- RunningCoefs %>% filter(Odorant !="Methyl eugenol")
+
+RunningCoefs$Odorant[str_detect(RunningCoefs$Odorant,"\\(R\\).+Limonene")]="(R)-(+)-Limonene"
+
+
+
+FollowUpCompendium <- read_csv("FollowUpCompendium20180518.csv")
+
+
+#look at stats for FDRs
+
+
+#unique(RunningCoefs$Odorant)
+
+Filtered_FDR<-RunningCoefs %>% group_by(OR,Odorant) %>% summarise(Hit1000FDR=mean(FDR[Conc_uM==1000], na.rm= TRUE), Hit10_100FDR= max(FDR[Conc_uM==10],FDR[Conc_uM==100],na.rm=TRUE), Hit100_1000FDR= max(FDR[Conc_uM==100],FDR[Conc_uM==1000], na.rm=TRUE), Hit10_1000FDR= max(FDR[Conc_uM==10],FDR[Conc_uM==1000],na.rm=TRUE),MaxLogFC=max(logFC)) %>% mutate(MinFDR=pmin(Hit1000FDR,Hit10_100FDR,Hit10_1000FDR))
+
+
+Filtered_FDR_Followup<- Filtered_FDR %>% inner_join(FollowUpCompendium, by=c("OR","Odorant"))
+
+
+EmpiricalFDRCutoff<-0.01 # set cutoff to 1% FDR 
+
+
+Filtered_FDR_Followup %>% ggplot(aes(x=MaxLogFC, y=-log10(MinFDR), color=RealHit)) + geom_point(alpha=.7)+ geom_hline(yintercept=-log10(EmpiricalFDRCutoff),linetype="dashed") + labs(x="log2 fold change", y= "-log10(FDR)",color="Recapitulated  \n in Orthogonal Assay")
+
+
+#gives 21 out of 28 that do recapitulate in an orthogonal assay.
+
+ggsave("FigS5A.pdf")
+
+
+Filtered_FDR %>% ggplot(aes(x=MaxLogFC, y=-log10(MinFDR))) + geom_point(alpha=.7)+ geom_hline(yintercept=-log10(EmpiricalFDRCutoff),linetype="dashed") + labs(x="log2 fold change", y= "-log10(FDR)")
+
+
+ggsave("FigS5B.pdf")
+
+
+
+PassThreshold<- Filtered_FDR %>% filter(MinFDR<EmpiricalFDRCutoff, MaxLogFC>0, !(Odorant %in% c("Control_1","Control_2")) )  %>% mutate(min_activating_conc=NA)
+
+
+PassThreshold$min_activating_conc[PassThreshold$Hit1000FDR<EmpiricalFDRCutoff]=1000
+
+PassThreshold$min_activating_conc[PassThreshold$Hit100_1000FDR<EmpiricalFDRCutoff]=100
+
+PassThreshold$min_activating_conc[PassThreshold$Hit10_100FDR<EmpiricalFDRCutoff | PassThreshold$Hit10_1000FDR<EmpiricalFDRCutoff]=10
+
+ActivatingConcList<-PassThreshold%>% dplyr::select(OR, Odorant, min_activating_conc)
+
+
+
+write_csv(ActivatingConcList,"AllORHits20180620.csv")
+
+
+write_csv(Filtered_FDR,"FilteredFDR.csv")
+
+
+RunningCoefs$Conc_uM<-as.numeric(RunningCoefs$Conc_uM)
+
+ORHitsWithStats<-ActivatingConcList %>% left_join(RunningCoefs,by=c("Odorant","OR","min_activating_conc"="Conc_uM")) %>% select(OR, Odorant, min_activating_conc,logFC,PValue, FDR)
+
+
+write_csv(ORHitsWithStats,"AllORHitsWithStats.csv")
+
+```
+```{r Fig2B}
+load("EdgeROutputs.RData")
+RunningCoefs$OR<-gsub("_", "-", RunningCoefs$OR)#change the name of some variables to make them easier to read
+RunningCoefs<-RunningCoefs %>% mutate(OR=paste0("MOR",OR)) 
+RunningCoefs$OR[RunningCoefs$OR=="MOR62"]<-"Olfr62"
+RunningCoefs$OR[RunningCoefs$OR=="MOR131-1-2"]<-"MOR131-1"
+RunningCoefs$OR[RunningCoefs$OR=="MOR23-1-2"]<-"MOR23-1"
+
+RunningCoefs <- RunningCoefs %>% filter(Odorant !="Methyl eugenol")
+
+RunningCoefs$Odorant[str_detect(RunningCoefs$Odorant,"\\(R\\).+Limonene")]="(R)-(+)-Limonene"
+
+
+AllHits<-read_csv("AllORHits20180620.csv")
+
+AllHits$OR<-gsub("_", "-", AllHits$OR)#change the name of some variables to make them easier to read
+AllHits<-AllHits %>% mutate(OR=paste0("MOR",OR)) 
+AllHits$OR[AllHits$OR=="MOR62"]<-"Olfr62"
+AllHits$OR[AllHits$OR=="MOR131-1-2"]<-"MOR131-1"
+AllHits$OR[AllHits$OR=="MOR23-1-2"]<-"MOR23-1"
+
+
+
+Distinct_Combos <- distinct(RunningCoefs, OR, Odorant)
+
+Distinct_Combos<- left_join(Distinct_Combos,AllHits)
+
+Odorant_hit_count <- AllHits %>% group_by(Odorant) %>% summarize(count=n())
+
+
+OdorantList <- unique(Distinct_Combos$Odorant) #get all ORs
+
+
+Odorant_hit_count<- Odorant_hit_count %>% full_join(tibble(OdorantList), by = c("Odorant"="OdorantList")) %>%
+  replace_na(list(count= 0)) #add the non-hit ORs to the list and make sure they are set as zeros
+
+Odorant_hit_count <- Odorant_hit_count %>% arrange(desc(count)) # arrange ORs from most hit to least
+
+
+Distinct_Combos$Odorant<- factor(Distinct_Combos$Odorant, levels = as.character(Odorant_hit_count$Odorant))
+
+Distinct_Combos_Hits <- Distinct_Combos %>% 
+  filter(OR %in% AllHits$OR) %>% 
+  filter(Odorant %in% AllHits$Odorant) 
+
+
+Distinct_Combos_Matrix<- Distinct_Combos_Hits %>% 
+  replace_na(list(min_activating_conc= 10^4)) %>% 
+  spread(key = OR, min_activating_conc)
+
+row.names(Distinct_Combos_Matrix) <- Distinct_Combos_Matrix$Odorant
+
+
+Distinct_Combos_Matrix <- Distinct_Combos_Matrix %>% dplyr::select(-Odorant) 
+
+color <- colorRampPalette(brewer.pal(9, "Blues"))(4);
+
+color[1]="#FFFFFF"
+
+
+
+pdf(file="ClusteredHeatmap.pdf", width = 5, height = 10)
+heatmap.2(as.matrix(4-log10(Distinct_Combos_Matrix)), margins=c(3,10), density.info="none", xlab="OR", ylab="Odorants", scale='none', trace="none", col= color, cexRow=.5, offsetRow =-.4, offsetCol =-.55,cexCol=.35,srtCol = 45,dendrogram="none")
+
+#, labCol="",labRow="", add.expr = text(x = c(rep(c(35,35),ceiling(length(rownames(Distinct_Combos_Matrix))/2))) , y= seq_along(rownames(Distinct_Combos_Matrix)) ,adj = c(0, NA), labels=rownames(Distinct_Combos_Matrix), xpd=NA,cex=.5))
+
+
+#text(x = (seq_along(colnames(Distinct_Combos_Matrix))-.7), y=-3, srt=45, labels=colnames(Distinct_Combos_Matrix), xpd=NA,cex=0.4)
+
+dev.off()
+```
+
+
+
+
+```{r Plot Followup Luceiferase vs sequencing data}
+
+load("EdgeROutputs.RData")
+
+RunningCoefs$Odorant[str_detect(RunningCoefs$Odorant,"\\(R\\).+Limonene")]="(R)-(+)-Limonene"
+
+NoOR_Controls <- read_csv("20180521_All37NoORs.csv")
+
+LucFollowUps <- read_csv("Follow-up_Hits_20180521.csv")
+
+
+
+
+# reshape and normalize data
+
+NoOR_Controls<- NoOR_Controls %>% gather(key="Replicate", value="Signal",Rep1:Rep3)
+
+LucFollowUps <- LucFollowUps %>% gather(key="Replicate", value="Signal",Rep1:Rep3)
+
+
+FollowupData<-rbind(NoOR_Controls,LucFollowUps)
+
+
+MeanZeroData<- FollowupData %>% group_by(Receptor, Treatment, Concentration) %>% summarise(MeanZeroSignal=mean(Signal)) %>% filter(Concentration==0) %>% select(-Concentration)
+
+
+FollowupDataNormalized<- left_join(FollowupData,MeanZeroData,by=c("Receptor","Treatment")) %>% mutate(NormalizedSignal=Signal/MeanZeroSignal) %>% select(-Replicate, -Signal, -MeanZeroSignal)
+
+RecTreatCombo <- FollowupDataNormalized %>% mutate(Receptor_Treatment=paste(Receptor,Treatment,sep=":")) %>% select(Receptor_Treatment)
+
+AllCombos <- unique(RecTreatCombo$Receptor_Treatment)
+
+TreatmentList<-unique(FollowupDataNormalized$Treatment)
+
+
+
+SeqData<-RunningCoefs %>% filter(Odorant %in% TreatmentList) %>% mutate(Receptor=OR,Treatment=Odorant, Concentration=as.numeric(Conc_uM)/1000000, NormalizedSignal=(2^logFC)) %>% select(Receptor, Treatment, Concentration, NormalizedSignal) %>% mutate(Receptor_Treatment=paste(Receptor,Treatment,sep=":")) %>% filter(Receptor_Treatment %in% AllCombos) %>% mutate(Receptor=paste0(Receptor,", Seq")) %>% select(-Receptor_Treatment)
+
+
+
+
+AllData=rbind(FollowupDataNormalized,SeqData)
+# plot data
+
+CurrentTreatment<-"benzyl benzoate"
+AllData$Concentration[AllData$Concentration==0]=.000001
+
+for (CurrentTreatment in TreatmentList) {
+  
+
+  print(CurrentTreatment)
+
+NoInsertData<- AllData %>% filter(Treatment==CurrentTreatment,Receptor=="None")
+
+ORData<- AllData %>% filter(Treatment==CurrentTreatment, Receptor!="None")
+  
+
+ggplot(data=NULL) + geom_point( data=NoInsertData, aes(x=Concentration*1000000, y= NormalizedSignal), color="black",alpha=.7) + stat_summary(data=NoInsertData, aes(x=Concentration*1000000,y = NormalizedSignal), color="black", fun.y=mean, geom="line", na.rm=TRUE) + geom_point( data=ORData, aes(x=Concentration*1000000, y= NormalizedSignal, color=Receptor),alpha=.7) + stat_summary(data=ORData, aes(x=Concentration*1000000,y = NormalizedSignal,color=Receptor), fun.y=mean, geom="line", na.rm=TRUE) + theme(legend.position = c(0.02, 0.8)) + scale_x_continuous(trans="log10") + coord_cartesian(xlim=c(10,1000)) + labs(x="Concentration [uM]",y="Normalized Response")
+
+
+ 
+  ggsave(paste0(CurrentTreatment,"_Followup.pdf")) 
+  
+  
+}
+
+```
+
+```{r Figure S7, echo=FALSE}
+
+#Get data in correct Format
+
+load("EdgeROutputs.RData")
+Filtered_FDR<-read_csv("FilteredFDR.csv")
+
+MatsunamiORResults <- read_excel("MatsunamiORResults.xls", 
+    col_types = c("text", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric"))
+
+ORCode <- read_excel("ORCode.xlsx")
+
+
+Matsunami_InLib <- MatsunamiORResults %>% 
+  filter(InLib==1, !is.na(Vanillic_Acid)) %>% 
+  left_join(ORCode, by = c("OR" = "RealName"))
+
+
+#reshape this first
+Matsunami_Reshaped <- Matsunami_InLib %>% 
+  gather(key = "Chem", value = "EC50",3:65) 
+
+Matsunami_Filtered<-Matsunami_Reshaped %>% filter(Chem %in% Filtered_FDR$Odorant) #only use chemicals found in Odorant_list
+  
+
+Matsunami_Hits <- Matsunami_Filtered %>% filter(EC50<0) #actually has a response
+
+
+ComparisonData_filtered <- Filtered_FDR %>% right_join(Matsunami_Filtered,by=c("OR"="Code","Odorant"="Chem"))
+
+
+
+#ComparisonData_MaxFC <- ComparisonData_filtered %>% group_by(OR,Odorant, EC50) %>% summarize(MaxLogFC=max(logFC), FDR=ComparisonData_filtered$FDR[ComparisonData_filtered$logFC==MaxLogFC]) 
+
+
+ComparisonData_filtered$EC50[ComparisonData_filtered$EC50==0]=NA
+
+ComparisonData_MaxFC_NoHiroHit<-ComparisonData_filtered %>% filter(is.na(EC50))
+
+ComparisonData_MaxFC_YesHiroHit<-ComparisonData_filtered %>% filter(!is.na(EC50))
+
+EmpiricalFDRCutoff<-0.01 # FDR cutoff to call hits
+
+ComparisonData_MaxFC_YesHiroHit %>% filter(MinFDR<=EmpiricalFDRCutoff)
+
+ggplot(data=NULL, aes(x=MaxLogFC, y=-log10(MinFDR),color=-EC50)) + geom_point(data=ComparisonData_MaxFC_NoHiroHit,alpha=.5)+ geom_point(data=ComparisonData_MaxFC_YesHiroHit) + coord_cartesian(xlim=c(-1,5), ylim=c(0,80)) + labs(x = "log2(Fold Activation)", y = "-log10(FDR)", color="-log10(EC50)") + scale_color_viridis() + geom_hline(yintercept=-log10(EmpiricalFDRCutoff),linetype="dashed")
+
+
+ggsave("FigureS7A.pdf")
+
+
+ComparisonData_MaxFC_YesHiroHit %>% ggplot(aes(x=-EC50, y=-log10(MinFDR), color= MaxLogFC  )) + geom_point() +labs(x = "-log10(EC50) (Saito et. al)", y = "-log10(FDR)", color="log2(Fold Change)") + scale_color_viridis()  + coord_cartesian(xlim=c(3,7)) + geom_hline(yintercept=-log10(EmpiricalFDRCutoff),linetype="dashed")
+
+
+ggsave("FigureS7B.pdf")
+
+```
+ML part
