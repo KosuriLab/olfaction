@@ -1,0 +1,113 @@
+OR,Odorant,min_activating_conc
+102_1,Cedryl acetate,1e3
+112_1,Benzaldehyde,1e3
+112_1,galaxolide,100
+119_1,Axe (10 uM),1e3
+119_1,Furfuryl methyl disulfide,1e3
+119_1,n-Decyl acetate,100
+120_1,Cedryl acetate,1e3
+120_1,Lyral,1e3
+120_1,Nonanethiol,1e3
+13_1,Benzaldehyde,1e3
+13_1,Cyclobutanecarboxylic acid,1e3
+13_1,Pentanoic Acid,1e3
+13_1,trans-2-Methyl-2-butenal (2MB),1e3
+131_1_2,(-)-Perillaaldehyde,1e3
+131_1_2,1-hexanol,1e3
+131_1_2,"3,4-Hexanedione",1e3
+131_1_2,galaxolide,1e3
+132_1,Cedryl acetate,1e3
+133_1,3-Octanone,1e3
+134_1,Chanel No 5 (10 uM),1e3
+136_1,(-)-Dihydrocarveol,1e3
+136_1,(+)-Camphor,100
+136_1,(+)-Dihydrocarveol,1e3
+136_1,2-Ethylphenol,100
+136_1,Olibanum Coeur MD,1e3
+139_1,(-)-Dihydrocarveol,1e3
+139_1,(+)-Dihydrocarvone,1e3
+139_1,(+)-Pulegone,1e3
+139_1,2-sec-Butyl-3-methoxypyrazine,1e3
+139_1,4-Chromanone,1e3
+139_1,beta-ionone,1e3
+139_1,Butanal,1e3
+139_1,Dihydrojasmone,1e3
+139_1,Dimethyl anthranilate,1e3
+139_1,Eugenol,1e3
+139_1,Eugenol methyl ether,1e3
+139_1,helional,1e3
+139_1,Neryl isobutyrate,1e3
+139_1,"Quinoline (1-Benzazine;  2,3-Benzopyridine)",100
+142_1,Bis(2-methyl-3-furyl)disulphide),1e3
+142_1,Cedryl acetate,1e3
+158_1,Iso E Super,1e3
+165_1,decanedioic acid (sebacic acid),1e3
+165_1,Octyl formate,1e3
+170_1,2-Bromohexanoic acid,1e3
+170_1,2-Phenethyl acetate,1e3
+170_1,4-Chromanone,100
+170_1,4-Ethylphenol,1e3
+170_1,Anisaldehyde,1e3
+170_1,Benzyl acetate,1e3
+170_1,benzyl benzoate (Pentamethylbenzaldehyde),10
+170_1,Chanel No 5 (10 uM),1e3
+170_1,Cinnamyl alcohol,1e3
+170_1,Dimethyl anthranilate,10
+170_1,ethyl maltol,1e3
+170_1,Eugenol methyl ether,10
+170_1,helional,1e3
+170_1,Piperonal,1e3
+170_1,Piperonyl acetate,1e3
+170_1,"Quinoline (1-Benzazine;  2,3-Benzopyridine)",100
+170_1,Vanillin,1e3
+180_1,a-Amylcinnamaldehyde dimethyl acetal,1e3
+180_1,Axe (10 uM),1e3
+189_1,4-Chromanone,1e3
+189_1,benzyl benzoate (Pentamethylbenzaldehyde),1e3
+189_1,beta-Damascone,1e3
+189_1,beta-ionone,1e3
+189_1,Cedryl acetate,1e3
+189_1,Eugenol methyl ether,1e3
+189_1,"Quinoline (1-Benzazine;  2,3-Benzopyridine)",1e3
+19_1,Benzyl salicylate,10
+19_1,Methyl salicylate,1e3
+199_1,ethyl maltol,100
+203_1,helional,1e3
+203_1,Piperonyl acetate,1e3
+208_1,Cedryl acetate,1e3
+23_1_2,2-Bromooctanoic acid,1e3
+23_1_2,6-Bromohexanoic acid,100
+23_1_2,Heptanal,1e3
+23_1_2,Hexanoic Acid,1e3
+23_1_2,Nonanal,1e3
+23_1_2,Nonanoic Acid,1e3
+23_1_2,Octanal,100
+25_1,(-)-Carvone,1e3
+25_1,Decanal,1e3
+25_1,Decanoic_Acid,100
+25_1,Nonanoic Acid,1e3
+30_1,Cedryl acetate,1e3
+30_1,Decanal,100
+30_1,Decanoic_Acid,10
+30_1,Nonanal,1e3
+30_1,Nonanoic Acid,100
+4_1,Hexanoic Acid,1e3
+4_1,Pentanoic Acid,1e3
+5_1,2-Bromohexanoic acid,1e3
+5_1,2-Bromooctanoic acid,1e3
+5_1,6-Bromohexanoic acid,1e3
+5_1,cis-4-Decenal,1e3
+5_1,cis-6-Nonenal,1e3
+5_1,Decanoic_Acid,1e3
+5_1,Hexanoic Acid,1e3
+5_1,Nonanal,1e3
+5_1,Nonanoic Acid,100
+5_1,Octanal,1e3
+5_1,Olibanum Coeur MD,1e3
+62,2_coumaranone,1e3
+62,Benzaldehyde,1e3
+62,Benzophenone,1e3
+62,ethyl maltol,1e3
+62,Piperonal,1e3
+62,"Quinoline (1-Benzazine;  2,3-Benzopyridine)",1e3
+9_1,galaxolide,1e3
