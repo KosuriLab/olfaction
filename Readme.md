@@ -23,5 +23,5 @@ What things you need to install the software and how to install them
 
 ## Authors
 
-Eric M. Jones*, Rishi Jajoo*, Daniel Cancilla1, Nathan B. Lubock1, Jeff Wang, Megan Satyadi, Rocky Cheung, Claire de March, Hiroaki
+Eric M. Jones*, Rishi Jajoo*, Daniel Cancilla1, Nathan B. Lubock, Jeff Wang, Megan Satyadi, Rocky Cheung, Claire de March, Hiroaki
 Matsunami, Sriram Kosuri
